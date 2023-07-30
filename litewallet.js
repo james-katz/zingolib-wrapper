@@ -22,8 +22,21 @@ class LiteWallet {
         this.updateDataLock = false;
     }
 
+    restore(mnemonic, birthday, allowOverwrite) {
+        return new Promise(async (resolve, reject) => {
+            if(mnemonic) {
+                const birth = birthday || 0;
+                const result = await native.zingolib_initialize_new_from_phrase(this.url, mnemonic, birth, allowOverwrite);
+                if (result.startsWith("Error")) {
+                    reject(result);
+                }
+                resolve('success');
+            }
+        });
+    }
+    
     init() {
-        return new Promise((resolve, reject) => {
+        return new Promise((resolve, reject) => {            
             if(!native.zingolib_wallet_exists(this.url)) {                
                 console.log('Wallet not configured, creating new one!');
                 const res = native.zingolib_initialize_new(this.url);
