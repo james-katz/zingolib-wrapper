@@ -78,10 +78,11 @@ class LiteWallet {
     }
 
     doRefreshAndUpdateData() {
+        this.refresh();
         if(!this.refreshTimerId) {
             this.refreshTimerId = setInterval(() => {
                 this.refresh();
-            }, 60 * 1000); // refresh wallet every 60 seconds
+            }, 75 * 1000); // refresh wallet every 75 seconds (average block)
         }
 
         if(!this.updateTimerId) {
