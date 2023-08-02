@@ -4,8 +4,17 @@ const { TxBuilder, PaymentDetect } = require('./utils/utils');
 const client = new Litewallet("https://mainnet.lightwalletd.com:9067/");
 
 client.init().then(()=> {
-    const bal = client.fetchAddressesWithBalance();
+    // Fetch wallet balance
+    const bal = client.fetchTotalBalance();
     console.log(bal);
-    client.deinitialize();    
-    
+
+    // Get all addresses
+    const addrs = client.fetchAllAddresses();
+    console.log(addrs);
+
+    // Get addresses with balance
+    const addrsbal = client.fetchAddressesWithBalance();
+    console.log(addrsbal);
+
+    client.deinitialize();        
 }).catch((err) => {console.log(err)});
