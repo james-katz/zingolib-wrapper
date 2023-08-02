@@ -13,7 +13,7 @@ $ npm run neon
 You'll need rust, openssl-dev and a few other dependencies.
 
 # Using it
-See `index.js` for usage example.
+See `index.js` and `examples` for usage example.
 
 # TODO
 Write documentation
