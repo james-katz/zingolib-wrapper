@@ -1,5 +1,5 @@
 const Litewallet = require('./litewallet');
-const { TxBuilder, PaymentDetect } = require('./utils/utils');
+// const { TxBuilder, PaymentDetect } = require('./utils/utils');
 
 const client = new Litewallet("https://mainnet.lightwalletd.com:9067/");
 
