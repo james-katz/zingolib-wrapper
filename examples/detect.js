@@ -5,7 +5,7 @@ const client = new Litewallet("https://mainnet.lightwalletd.com:9067/");
 
 client.init().then(()=> {
     const pd = new PaymentDetect(client);
-    
+    console.log("ready")
     // Detect only last deposit to wallet every 5000 ms
     // pd.detectSimple(5000);
 

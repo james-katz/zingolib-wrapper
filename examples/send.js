@@ -1,12 +1,12 @@
 const Litewallet = require('../litewallet');
 const { TxBuilder } = require('../utils/utils');
 
-const client = new Litewallet("https://mainnet.lightwalletd.com:9067/");
+const client = new Litewallet("https://mainnet.lightwalletd.com:9067/", "main");
 
-client.init().then(()=> {
+client.init().then(async ()=> {
     // Check if wallet has spend
     const amount = 0.0003
-    const bal = client.fetchTotalBalance();
+    const bal = await client.fetchTotalBalance();
     if(bal.spendable_orchard_balance > amount || bal.spendable_sapling_balance > amount || bal.transparent_balance > amount) {
         // Construct a basic transaction
         const tx = new TxBuilder()

@@ -4,8 +4,9 @@ const axios = require('axios');
 const { TxDetail, Transaction, TotalBalance, Address, AddressBalance, WalletSettings, Info } = require('./utils/classes');
 
 class LiteWallet {
-    constructor(url) {
+    constructor(url, chain) {
         this.url = url;
+        this.chain = chain || "main";
 
         this.lastSyncId;
         this.lastBlockHeight;
@@ -26,7 +27,7 @@ class LiteWallet {
         return new Promise(async (resolve, reject) => {
             if(mnemonic) {
                 const birth = birthday || 0;
-                const result = await native.zingolib_initialize_new_from_phrase(this.url, mnemonic, birth, allowOverwrite);
+                const result = await native.zingolib_initialize_new_from_phrase(this.url, mnemonic, birth, allowOverwrite, this.chain);
                 if (result.startsWith("Error")) {
                     reject(result);
                 }
@@ -36,10 +37,10 @@ class LiteWallet {
     }
     
     init() {
-        return new Promise((resolve, reject) => {            
-            if(!native.zingolib_wallet_exists(this.url)) {                
+        return new Promise(async (resolve, reject) => {            
+            if(!native.zingolib_wallet_exists(this.chain)) {                
                 console.log('Wallet not configured, creating new one!');
-                const res = native.zingolib_initialize_new(this.url);
+                const res = native.zingolib_initialize_new(this.url, this.chain);
                 if(res.toString().toLowerCase().startsWith('error')) {
                     reject("Error: Couldn't create a wallet");
                 }
@@ -49,23 +50,23 @@ class LiteWallet {
                 }
             }
             
-            let res = native.zingolib_initialize_existing(this.url);            
+            let res = native.zingolib_initialize_existing(this.url, this.chain);            
             if(res !== 'OK') {
                 reject('Something went wrong while initializing the wallet. \n'+ res + '\nQuitting ...');
                 return;
             }
-            native.zingolib_execute('sync', '');
+            native.zingolib_execute_spawn('sync', '');
             console.log('Starting wallet synchronization ...');
 
-            this.lastSyncId = JSON.parse(native.zingolib_execute('syncstatus','')).sync_id;
+            this.lastSyncId = JSON.parse(await native.zingolib_execute_async('syncstatus','')).sync_id;
 
             const syncPoller = setInterval(async () => {
-                var syncStatus = JSON.parse(native.zingolib_execute('syncstatus', ''));
+                var syncStatus = JSON.parse(await native.zingolib_execute_async('syncstatus', ''));
                 if(!syncStatus.in_progress && syncStatus.sync_id > this.lastSyncId) {
                     clearInterval(syncPoller);
                     this.lastBlockHeight = await this.fetchLatestBlockHeight();
                     this.lastTxId = this.fetchLastTxId();
-                    native.zingolib_execute('save','');
+                    await native.zingolib_execute_async('save','');
 
                     this.fetchTandZTransactions(this.lastBlockHeight);
                     
@@ -92,18 +93,18 @@ class LiteWallet {
         }
     }
 
-    createNewAddress(type) {
-        const ua = JSON.parse(native.zingolib_execute('new', type));                
+    async createNewAddress(type) {
+        const ua = JSON.parse(await native.zingolib_execute_async('new', type));                
         if(ua.error) return ua.error; // maybe return new Address()     ?
 
-        const addrDetail = this.fetchAllAddresses().filter((addr) => addr.address === ua[0]);
+        const addrDetail = await this.fetchAllAddresses().filter((addr) => addr.address === ua[0]);
         
         const addr = new Address(addrDetail[0].address, addrDetail[0].receivers);
         return addr;
     }
 
-    fetchTandZTransactions(latestBlockHeight) {    
-        const list = this.fetchTxList();
+    async fetchTandZTransactions(latestBlockHeight) {    
+        const list = await this.fetchTxList();
         
         let txList = list.map((tx) => {
             const transaction = new Transaction();
@@ -221,13 +222,13 @@ class LiteWallet {
 
         this.updateDataLock = true;
         
-        const latestTxId = this.fetchLastTxId();
+        const latestTxId = await this.fetchLastTxId();
 
         if(this.lastTxId !== latestTxId) {
             this.lastBlockHeight = await this.fetchLatestBlockHeight();
             this.lastTxId = latestTxId;        
             
-            this.fetchTandZTransactions(this.lastBlockHeight);
+            await this.fetchTandZTransactions(this.lastBlockHeight);
         }
 
         this.updateDataLock = false;
@@ -239,7 +240,7 @@ class LiteWallet {
         if(!this.lastBlockHeight || this.lastBlockHeight < latestBlockHeight || fullRefresh) {
             console.log('Refreshing wallet: ' + (latestBlockHeight - this.lastBlockHeight) + ' new blocks.');
             this.updateDataLock = true;
-            native.zingolib_execute('sync', '');
+            native.zingolib_execute_spawn('sync', '');
             let retryCount = 0;
             const syncPoller = setInterval(async () => {
                 const walletHeight = this.fetchWalletHeight();
@@ -249,11 +250,11 @@ class LiteWallet {
                     clearInterval(syncPoller);
                     console.log('Wallet is up to date!');
 
-                    this.fetchTandZTransactions(this.lastBlockHeight);
+                    await this.fetchTandZTransactions(this.lastBlockHeight);
 
                     this.lastBlockHeight = latestBlockHeight;
 
-                    native.zingolib_execute('save','');
+                    await native.zingolib_execute_async('save','');
                     this.updateDataLock = false;
                 }                
             }, 1000);
@@ -263,11 +264,11 @@ class LiteWallet {
 
     async sendTransaction(sendJson) {        
         // First, get the previous send progress id, so we know which ID to track
-        const prevProgress = this.getSendProgress();
+        const prevProgress = await this.getSendProgress();
         const prevSendId = prevProgress.id;  
       
         try {
-            await native.zingolib_execute("send", JSON.stringify(sendJson));
+            await native.zingolib_execute_async("send", JSON.stringify(sendJson));
         }
         catch(err) {
             console.log(err);
@@ -276,8 +277,8 @@ class LiteWallet {
 
         // The send command is async, so we need to poll to get the status
         const sendTxPromise = new Promise((resolve, reject) => {
-            const intervalID = setInterval(() => {
-                const progress = this.getSendProgress();
+            const intervalID = setInterval(async () => {
+                const progress = await this.getSendProgress();
                 if(progress.id === prevSendId) {
                     // Still not started, so wait for more time
                     console.log('waiting')
@@ -308,7 +309,7 @@ class LiteWallet {
     }
 
     async getInfoObject() {
-        const infostr = native.zingolib_execute("info", "");
+        const infostr = await native.zingolib_execute_async("info", "");
         try {
             const infoJSON = JSON.parse(infostr);
             
@@ -323,12 +324,12 @@ class LiteWallet {
             info.solps = 0;
             info.zecPrice = await this.getZecPrice();
 
-            // const encStatus = native.zingolib_execute("encryptionstatus", "");
+            // const encStatus = native.zingolib_execute_spawn("encryptionstatus", "");
             // const encJSON = JSON.parse(encStatus);
             // info.encrypted = encJSON.encrypted;
             // info.locked = encJSON.locked;
 
-            const walletHeight = this.fetchWalletHeight();
+            const walletHeight = await this.fetchWalletHeight();
             info.walletHeight = walletHeight;
 
             return info;
@@ -346,28 +347,28 @@ class LiteWallet {
         return info.latestBlock;
     }
 
-    fetchSeed() {
-        const seedStr = native.zingolib_execute("seed", "");
+    async fetchSeed() {
+        const seedStr = await native.zingolib_execute_async("seed", "");
         const seedJSON = JSON.parse(seedStr);
     
         return seedJSON.seed;
     }
 
-    getWalletBirthday() {        
-        const birthdayStr = native.zingolib_execute("get_birthday", "");        
+    async getWalletBirthday() {        
+        const birthdayStr = await native.zingolib_execute_async("get_birthday", "");        
     
         return birthdayStr;
     }
 
-    exportUfvkAsString() {
-        const ufvkStr = native.zingolib_execute("exportufvk", "");
+    async exportUfvkAsString() {
+        const ufvkStr = await native.zingolib_execute_async("exportufvk", "");
         const ufvkJSON = JSON.parse(ufvkStr);
     
         return ufvkJSON.ufvk;
     }
 
-    fetchTotalBalance() {
-        const balanceJSON = JSON.parse(native.zingolib_execute('balance',''));        
+    async fetchTotalBalance() {
+        const balanceJSON = JSON.parse(await native.zingolib_execute_async('balance',''));        
         const balance = new TotalBalance();
 
         // Every sapling balance
@@ -388,20 +389,19 @@ class LiteWallet {
         balance.total = balance.sapling_balance + balance.orchard_balance + balance.transparent_balance;
 
         return balance;
-
     }
 
-    fetchNotes() {
-        const notes = native.zingolib_execute("notes", "");
+    async fetchNotes() {
+        const notes = await native.zingolib_execute_async("notes", "");
         const notesJSON = JSON.parse(notes);
 
         return notesJSON;
     }
 
-    fetchUnspentNotes() {
-        const unspentNotes = native.zingolib_execute("notes", "");
+    async fetchUnspentNotes() {
+        const unspentNotes = await native.zingolib_execute_async("notes", "");
         const unspentJSON = JSON.parse(unspentNotes);
-        const addresses = this.fetchAllAddresses();
+        const addresses = await this.fetchAllAddresses();
     
         const addressBalances = {
                 orchard: [],
@@ -429,8 +429,8 @@ class LiteWallet {
         return addressBalances;
     }
 
-    fetchPendingNotes() {
-        const pendingNotes = native.zingolib_execute("notes", "");
+    async fetchPendingNotes() {
+        const pendingNotes = await native.zingolib_execute_async("notes", "");
         const pendingJSON = JSON.parse(pendingNotes);
         const addresses = this.fetchAllAddresses();
     
@@ -460,8 +460,8 @@ class LiteWallet {
         return pendingAddressBalances;
     }
 
-    fetchAllAddresses() {
-        const addressesJSON = JSON.parse(native.zingolib_execute("addresses", ""));
+    async fetchAllAddresses() {
+        const addressesJSON = JSON.parse(await native.zingolib_execute_async("addresses", ""));
         return addressesJSON;
     }
 
@@ -478,9 +478,9 @@ class LiteWallet {
         return Object.entries(result);
     }
 
-    fetchAddressesWithBalance() {
-        const addressBalancesJSON = this.fetchUnspentNotes();
-        const pendingAddressBalances = this.fetchPendingNotes();
+    async fetchAddressesWithBalance() {
+        const addressBalancesJSON = await this.fetchUnspentNotes();
+        const pendingAddressBalances = await this.fetchPendingNotes();
        
         const balanceJSON = {
             ua_addresses: [],
@@ -563,13 +563,13 @@ class LiteWallet {
         return addresses;
     }    
 
-    getDefaultFee() {
-        const fee = JSON.parse(native.zingolib_execute('defaultfee',''));
+    async getDefaultFee() {
+        const fee = JSON.parse(await native.zingolib_execute_async('defaultfee',''));
         return parseFloat(fee.defaultfee);
     }
 
     async getZecPrice() {
-        const res = native.zingolib_execute('updatecurrentprice','');
+        const res = await native.zingolib_execute_async('updatecurrentprice','');
         if(res.toString().toLowerCase().startsWith('error')) return 0;
         
         return parseFloat(res);
@@ -592,8 +592,8 @@ class LiteWallet {
         // return parseFloat(this.lastZecPrice);
     }
 
-    getSendProgress() {
-        const res = JSON.parse(native.zingolib_execute('sendprogress', ''));
+    async getSendProgress() {
+        const res = JSON.parse(await native.zingolib_execute_async('sendprogress', ''));
         return res;
     }
 
@@ -602,8 +602,8 @@ class LiteWallet {
         return this.transactionsList;
     }
 
-    fetchWalletHeight() {
-        const res = native.zingolib_execute('height','');
+    async fetchWalletHeight() {
+        const res = await native.zingolib_execute_async('height','');
         return JSON.parse(res).height;
     }
 
@@ -612,8 +612,8 @@ class LiteWallet {
         return res;
     }
 
-    fetchLastTxId() {
-        const txListStr = native.zingolib_execute("list", "");
+    async fetchLastTxId() {
+        const txListStr = await native.zingolib_execute_async("list", "");
         const txListJSON = JSON.parse(txListStr);
 
         if (txListJSON && txListJSON.length) {
@@ -623,18 +623,18 @@ class LiteWallet {
         }
     }
 
-    fetchTxList() {
-        const res = native.zingolib_execute('list','');
+    async fetchTxList() {
+        const res = await native.zingolib_execute_async('list','');
         return JSON.parse(res);
     }
 
     async fetchWalletSettings() {
-        const download_memos_str = native.zingolib_execute("getoption", "download_memos");
+        const download_memos_str = await native.zingolib_execute_async("getoption", "download_memos");
         const download_memos = JSON.parse(download_memos_str).download_memos;
 
         let spam_filter_threshold = "0";
         try {
-            const spam_filter_str = native.zingolib_execute("getoption", "spam_filter_threshold");
+            const spam_filter_str = await native.zingolib_execute_async("getoption", "spam_filter_threshold");
             spam_filter_threshold = JSON.parse(spam_filter_str).spam_filter_threshold;
             // console.log(`Spam filter threshold: ${spam_filter_threshold}`);
 
@@ -655,12 +655,12 @@ class LiteWallet {
   }
 
     async setWalletSettingOption(name, value) {
-        return new Promise((resolve, reject) => {
+        return new Promise(async(resolve, reject) => {
             try {
-                const r = native.zingolib_execute("setoption", `${name}=${value}`);
+                const r = await native.zingolib_execute_async("setoption", `${name}=${value}`);
                 if(r.toLowerCase().startsWith("error")) reject(r)
 
-                native.zingolib_execute('save','');
+                native.zingolib_execute_spawn('save','');
 
                 resolve(r)
             }
@@ -673,11 +673,11 @@ class LiteWallet {
 
     // async encryptWallet(password) {
     //     return new Promise((resolve, reject) => {
-    //         const resultStr = native.zingolib_execute("encrypt", password);
+    //         const resultStr = native.zingolib_execute_spawn("encrypt", password);
     //         const resultJSON = JSON.parse(resultStr);
     
     //         // And save the wallet
-    //         native.zingolib_execute('save','');
+    //         native.zingolib_execute_spawn('save','');
 
     //         if (resultJSON.result === "success") resolve("success");
     //         else reject(`Error! ${resultJSON.error}`);
@@ -686,11 +686,11 @@ class LiteWallet {
     
     // async decryptWallet(password) {  
     //     return new Promise((resolve, reject) => {
-    //         const resultStr = native.zingolib_execute("decrypt", password);
+    //         const resultStr = native.zingolib_execute_spawn("decrypt", password);
     //         const resultJSON = JSON.parse(resultStr);
         
     //         // And save the wallet
-    //         native.zingolib_execute('save','');
+    //         native.zingolib_execute_spawn('save','');
         
     //         if (resultJSON.result === "success") resolve("success");
     //         else reject(`Error! ${resultJSON.error}`);
@@ -699,7 +699,7 @@ class LiteWallet {
     
     // async lockWallet() {
     //     return new Promise((resolve, reject) => {
-    //         const resultStr = native.zingolib_execute("lock", "");
+    //         const resultStr = native.zingolib_execute_spawn("lock", "");
     //         const resultJSON = JSON.parse(resultStr);
 
     //         if (resultJSON.result === "success") resolve("success");
@@ -709,7 +709,7 @@ class LiteWallet {
 
     // async unlockWallet(password) {
     //     return new Promise((resolve, reject) => {
-    //         const resultStr = native.zingolib_execute("unlock", password);
+    //         const resultStr = native.zingolib_execute_spawn("unlock", password);
     //         const resultJSON = JSON.parse(resultStr);
             
     //         if (resultJSON.result === "success") resolve("success");
@@ -718,18 +718,18 @@ class LiteWallet {
     // }
 
     // encryptionStatus() {
-    //     const resultStr = native.zingolib_execute("encryptionstatus", "");
+    //     const resultStr = native.zingolib_execute_spawn("encryptionstatus", "");
     //     const resultJson = JSON.parse(resultStr);
     //     return resultJson;
     // }
 
-    encryptMessage(addr, msg) {
-        return new Promise((resolve, reject) => {
+    async encryptMessage(addr, msg) {
+        return new Promise(async (resolve, reject) => {
             const json = {
                 address: addr,
                 memo: msg
             };
-            const resultStr = native.zingolib_execute("encryptmessage", JSON.stringify(json));
+            const resultStr = await native.zingolib_execute_async("encryptmessage", JSON.stringify(json));
             const resultJson = JSON.parse(resultStr);
             if(!resultJson.error) {
                 resolve(resultJson.encrypted_base64);
@@ -741,8 +741,8 @@ class LiteWallet {
     }
 
     async decryptMessage(msg) {
-        return new Promise((resolve, reject) => {
-            const resultStr = native.zingolib_execute("decryptmessage", msg);
+        return new Promise(async (resolve, reject) => {
+            const resultStr = await native.zingolib_execute_async("decryptmessage", msg);
             const resultJson = JSON.parse(resultStr);            
             if(!resultJson.error) {
                 resolve(resultJson);
@@ -754,12 +754,12 @@ class LiteWallet {
     }
 
     doRescan() {
-        const syncstr = native.zingolib_execute("rescan", "");
+        const syncstr = native.zingolib_execute_spawn("rescan", "");
         console.log(`rescan exec result: ${syncstr}`);        
     }
 
-    parseAddress(addr) {
-        const res = native.zingolib_execute("parse_address", addr);        
+    async parseAddress(addr) {
+        const res = await native.zingolib_execute_async("parse_address", addr);        
         try {
             const resJson = JSON.parse(res);
             return resJson;
@@ -781,9 +781,9 @@ class LiteWallet {
         }
     }
 
-    deinitialize() {        
+    async deinitialize() {        
         this.clearTimers();
-        native.zingolib_execute('save','');
+        await native.zingolib_execute_async('save','');
         native.zingolib_deinitialize();
         process.exit();
     }
