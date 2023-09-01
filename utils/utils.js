@@ -113,17 +113,19 @@ class PaymentDetect extends EventEmitter {
     }
 
     async detectSimple(interval) {
+        console.log("Listening for new payment ...")
         this.lastTxId = await this.client.fetchLastTxId();
 
         const timer = setInterval(async ()=> {
-            const lastTx = await this.client.fetchLastTxId();            
+            const lastTx = await this.client.fetchLastTxId();                        
             if(lastTx !== this.lastTxId) {
                 this.lastTxId = lastTx;                                           
                 try {
-                    const tx = await this.client.getTransactionsList().filter((t) => t.txid === lastTx );                
-                    if(tx[0].type === 'receive') {                    
+                    const tx = await this.client.getTransactionsList()
+                    const txDetail = tx.filter((t) => t.txid === lastTx);
+                    if(txDetail[0].type === 'receive') {                    
                         console.log("Detected a new payment")
-                        this.emit('payment', tx[0]);
+                        this.emit('payment', txDetail[0]);
                     }
                 } catch(err) { console.log(err) }
             }
@@ -140,14 +142,15 @@ class PaymentDetect extends EventEmitter {
             if(lastTx !== this.lastTxId) {                
                 const txList = [];
                 try {
-                    const tx = await this.client.getTransactionsList().filter((t) => t.type === 'receive');                                        
-                    for(var i = 0; i < tx.length; i ++) {                                                
-                        if(tx[i].txid === this.lastTxId) {
+                    const tx = await this.client.getTransactionsList();
+                    const txDetail = tx.filter((t) => t.type === 'receive');                                        
+                    for(var i = 0; i < txDetail.length; i ++) {                                                
+                        if(txDetail[i].txid === this.lastTxId) {
                             console.log(`Detected ${i} new payments`);                            
                             break;
                         }
                         
-                        txList.push(tx[i]);
+                        txList.push(txDetail[i]);
                     }                    
                     if(txList.length > 0) this.emit("payments", txList);
                 } catch(err) { console.log(err) }  

@@ -432,7 +432,7 @@ class LiteWallet {
     async fetchPendingNotes() {
         const pendingNotes = await native.zingolib_execute_async("notes", "");
         const pendingJSON = JSON.parse(pendingNotes);
-        const addresses = this.fetchAllAddresses();
+        const addresses = await this.fetchAllAddresses();
     
         const pendingAddressBalances = {
             orchard: [],
@@ -597,8 +597,8 @@ class LiteWallet {
         return res;
     }
 
-    getTransactionsList() {
-        // this.fetchTandZTransactions();
+    async getTransactionsList() {        
+        await this.fetchTandZTransactions(this.lastBlockHeight);
         return this.transactionsList;
     }
 
@@ -616,7 +616,7 @@ class LiteWallet {
         const txListStr = await native.zingolib_execute_async("list", "");
         const txListJSON = JSON.parse(txListStr);
 
-        if (txListJSON && txListJSON.length) {
+        if (txListJSON && txListJSON.length && txListJSON.length > 0) {
             return txListJSON[txListJSON.length - 1].txid;
         } else {
             return '0';

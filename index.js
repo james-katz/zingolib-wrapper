@@ -16,5 +16,14 @@ client.init().then(async ()=> {
     const addrsbal = await client.fetchAddressesWithBalance();
     console.log(addrsbal);
 
+    // Get last txid
+    const txid = await client.fetchLastTxId();
+    console.log(txid);
+
+    // Get last transaction details
+    const tx = await client.getTransactionsList();
+    const lastTx = tx.filter((t) => t.txid === txid);
+    console.log(lastTx[0].type);
+
     client.deinitialize();        
 }).catch((err) => {console.log(err)});
