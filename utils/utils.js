@@ -1,4 +1,5 @@
 const { EventEmitter } = require('events');
+const { Buffer } = require('buffer');
 
 class TxBuilder {
     constructor() {
@@ -26,6 +27,10 @@ class TxBuilder {
     setMemo(memo) {
         this.memo = memo;
         return this;
+    }
+
+    fromPaymentURI(uri) {
+
     }
 
     getSendJSON() {                  
@@ -73,6 +78,15 @@ class TxBuilder {
         this.memo = "";
         
         return sendJSON.flat();
+    }
+
+    getPaymentURI() {
+        const memo64 = Buffer.from(this.memo, 'utf-8')
+        .toString('base64')
+        .replaceAll('=', '')
+        .replaceAll('+', '-')
+        .replaceAll('/', '_')
+        return `zcash:${this.recipient}?amount=${this.amount}&memo=${memo64}`
     }
 
     utf16Split(s, chunksize) {

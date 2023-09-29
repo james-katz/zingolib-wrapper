@@ -16,11 +16,14 @@ client.init().then(async ()=> {
 
         // Get the sendjson
         const sendJson = tx.getSendJSON();
+        console.log(sendJson);
+        const uri = tx.getPaymentURI();
+        console.log(uri)
         
-        client.sendTransaction(sendJson).then((txid) => {
-            console.log(txid);
-            // Deinitialize the client
-            client.deinitialize();
-        });
+        // client.sendTransaction(sendJson).then((txid) => {
+        //     console.log(txid);
+        //     // Deinitialize the client
+        //     client.deinitialize();
+        // });
     }
 });

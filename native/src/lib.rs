@@ -109,7 +109,7 @@ fn zingolib_initialize_new(mut cx: FunctionContext) -> JsResult<JsString> {
         let _ = LightClient::init_logging();
 
         let seed = match lightclient.do_seed_phrase_sync() {
-            Ok(s) => s.dump(),
+            Ok(s) => s.seed_phrase,
             Err(e) => {
                 return format!("Error: {}", e);
             }
