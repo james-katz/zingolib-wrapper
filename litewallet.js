@@ -45,7 +45,7 @@ class LiteWallet {
                     reject("Error: Couldn't create a wallet");
                 }
                 else {
-                    const seed = JSON.parse(res).seed;
+                    const seed = await native.zingolib_execute_async("seed", "");
                     console.log("Wallet created! Please save the wallet seed:\n" + seed);                    
                 }
             }
