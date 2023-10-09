@@ -18,6 +18,7 @@ class LiteWallet {
         this.lastZecPrice;
         this.lastPriceFetch;
         
+        this.syncTimerID;
         this.refreshTimerId;
         this.updateTimerId;
         this.updateDataLock = false;
@@ -234,30 +235,56 @@ class LiteWallet {
         this.updateDataLock = false;
     }
 
-    async refresh(fullRefresh) {       
+    async refresh(fullRefresh) { 
+        if (this.syncTimerID) {
+            console.log("Already have a sync process launched", this.syncTimerID);
+            return;
+        }     
+
         const latestBlockHeight = await this.fetchLatestBlockHeight();
+        const walletHeight= await this.fetchWalletHeight();
         
-        if(!this.lastBlockHeight || this.lastBlockHeight < latestBlockHeight || fullRefresh) {
+        if(!this.lastBlockHeight || this.lastBlockHeight < latestBlockHeight || walletHeight < latestBlockHeight || fullRefresh) {
             console.log('Refreshing wallet: ' + (latestBlockHeight - this.lastBlockHeight) + ' new blocks.');
+            
             this.updateDataLock = true;
             native.zingolib_execute_spawn('sync', '');
             let retryCount = 0;
-            const syncPoller = setInterval(async () => {
+
+            this.syncTimerID = setInterval(async () => {
                 const walletHeight = this.fetchWalletHeight();
-                retryCount ++;
+                // retryCount ++;
 
                 if(retryCount > 30 || walletHeight >= latestBlockHeight) {                    
-                    clearInterval(syncPoller);
+                    clearInterval(this.syncTimerID);
+                    this.syncTimerID = undefined;
+
                     console.log('Wallet is up to date!');
 
-                    await this.fetchTandZTransactions(this.lastBlockHeight);
+                    await this.fetchTandZTransactions(latestBlockHeight);
 
                     this.lastBlockHeight = latestBlockHeight;
 
                     await native.zingolib_execute_async('save','');
                     this.updateDataLock = false;
+                }
+                else {
+                    const ssStr = await native.zingolib_execute_async("syncstatus", "");;
+                    const ss = JSON.parse(ssStr);
+                    if (!ss.in_progress) {
+                        clearInterval(this.syncTimerID);
+                        this.syncTimerID = undefined;
+
+                        this.fetchTotalBalance();
+                        this.fetchTandZTransactions(latestBlockHeight);
+
+                        this.lastBlockHeight = latestBlockHeight;
+
+                        await native.zingolib_execute_async('save','');
+                        this.updateDataLock = false;
+                    }
                 }                
-            }, 1000);
+            }, 2000);
         }
         else console.log('no new blocks');
     }
