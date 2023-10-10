@@ -335,6 +335,12 @@ class LiteWallet {
         return sendTxPromise;
     }
 
+    async getSyncStatus() {
+        const ssStr = await native.zingolib_execute_async('syncstatus','');
+        const ss = JSON.parse(ssStr);
+        return ss;
+    }
+
     async getInfoObject() {
         const infostr = await native.zingolib_execute_async("info", "");
         try {

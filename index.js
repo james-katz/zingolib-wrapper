@@ -16,6 +16,10 @@ client.init().then(async ()=> {
     const addrsbal = await client.fetchAddressesWithBalance();
     console.log(addrsbal);
 
+    // Get sync status
+    const syncStatus = await client.getSyncStatus();
+    console.log(syncStatus);
+
     // Get last txid
     const txid = await client.fetchLastTxId();
     console.log(txid);
