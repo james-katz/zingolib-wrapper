@@ -20,10 +20,10 @@ client.init().then(async ()=> {
         const uri = tx.getPaymentURI();
         console.log(uri)
         
-        // client.sendTransaction(sendJson).then((txid) => {
-        //     console.log(txid);
-        //     // Deinitialize the client
-        //     client.deinitialize();
-        // });
+        client.sendTransaction(sendJson).then((txid) => {
+            console.log(txid);
+            // Deinitialize the client
+            client.deinitialize();
+        });
     }
 });
