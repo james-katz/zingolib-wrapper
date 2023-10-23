@@ -86,7 +86,7 @@ class TxBuilder {
         .replaceAll('=', '')
         .replaceAll('+', '-')
         .replaceAll('/', '_')
-        return `zcash:${this.recipient}?amount=${this.amount}&memo=${memo64}`
+        return `zcash:${this.recipient}?amount=${this.amount / 10**8}&memo=${memo64}`
     }
 
     utf16Split(s, chunksize) {

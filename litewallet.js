@@ -104,6 +104,227 @@ class LiteWallet {
         return addr;
     }
 
+    async zingolibTxSummaries() {
+        // fetch transaction summaries
+        const txSummariesStr = await native.zingolib_execute_async("summaries", "");
+        const txSummariesJSON = JSON.parse(txSummariesStr);
+    
+        return txSummariesJSON;
+    }
+
+    // Fetch all T and Z and O transactions
+    async fetchTandZandOTransactionsSummaries(latestBlockHeight) {
+        const summariesJSON = await this.zingolibTxSummaries();
+
+        //console.log('summaries antes', summariesJSON);
+
+        let txList = [];
+
+        summariesJSON
+        //.filter(tx => tx.kind !== 'Fee')
+        .forEach((tx) => {
+            let currentTxList = txList.filter(t => t.txid === tx.txid);
+            if (currentTxList.length === 0) {
+                currentTxList = [{}];
+                currentTxList[0].txDetails = [];
+            }
+            let restTxList = txList.filter(t => t.txid !== tx.txid);
+
+            const type = tx.kind === 'Fee' ? 'Sent' : tx.kind;
+            if (!currentTxList[0].type && !!type) {
+                currentTxList[0].type = type;
+            }
+            if (!currentTxList[0].confirmations) {
+                currentTxList[0].confirmations = latestBlockHeight
+                ? latestBlockHeight - tx.block_height + 1
+                : 0;
+            }
+            if (!currentTxList[0].txid && !!tx.txid) {
+                currentTxList[0].txid = tx.txid;
+            }
+            if (!currentTxList[0].time && !!tx.datetime) {
+                currentTxList[0].time = tx.datetime;
+            }
+            if (!currentTxList[0].zec_price && !!tx.price && tx.price !== 'None') {
+                currentTxList[0].zec_price = tx.price;
+            }
+
+            //if (tx.txid.startsWith('426e')) {
+            //  console.log('tran: ', tx);
+            //  console.log('--------------------------------------------------');
+            //}
+
+            let currenttxdetails = {};
+            if (tx.kind === 'Fee') {
+                currentTxList[0].fee = (currentTxList[0].fee ? currentTxList[0].fee : 0) + tx.amount / 10 ** 8;
+                if (currentTxList[0].txDetails.length === 0) {
+                    // when only have 1 item with `Fee`, we assume this tx is `SendToSelf`.
+                    currentTxList[0].type = 'SendToSelf';
+                    currenttxdetails.address = '';
+                    currenttxdetails.amount = 0;
+                    currentTxList[0].txDetails.push(currenttxdetails);
+                }
+            } 
+            else {
+                currenttxdetails.address = !tx.to_address || tx.to_address === 'None' ? '' : tx.to_address;
+                currenttxdetails.amount = tx.amount / 10 ** 8;
+                currenttxdetails.memos = !tx.memos ? undefined : tx.memos;
+                currenttxdetails.pool = !tx.pool || tx.pool === 'None' ? undefined : tx.pool;
+                currentTxList[0].txDetails.push(currenttxdetails);
+            }
+
+            //currentTxList[0].txDetails.forEach(det => console.log(det.memos));
+            //console.log(currentTxList[0]);
+            txList = [...currentTxList, ...restTxList];
+        });
+
+        //console.log('summaries despues', txList);
+
+        // Now, combine the amounts and memos
+        const combinedTxList = [];
+        txList.forEach((txns) => {
+            //console.log(txns.txDetails.length); 
+            const combinedTx = txns;
+            if (txns.type === 'Sent' || txns.type === 'SendToSelf') {
+                // using address for `Sent` & `SendToSelf`
+                combinedTx.txDetails = this.combineTxDetailsByAddress(txns.txDetails);
+            } 
+            else {
+                // using pool for `Received`
+                combinedTx.txDetails = this.combineTxDetailsByPool(txns.txDetails);
+            }
+
+            //combinedTx.txDetails.forEach(det => console.log(det.memos));
+            //console.log(combinedTx);
+            combinedTxList.push(combinedTx);
+        });
+
+        //console.log(combinedTxList);
+
+        this.transactionsList = combinedTxList;
+    }
+
+    // We combine detailed transactions if they are sent to the same outgoing address in the same txid. This
+    // is usually done to split long memos.
+    // Remember to add up both amounts and combine memos
+    combineTxDetailsByAddress(txdetails) {
+    // First, group by outgoing address.
+    //console.log(txdetails);
+    const m = new Map();
+    txdetails
+    .filter(i => i.address !== undefined)
+    .forEach(i => {
+        const coll = m.get(i.address);
+        if (!coll) {
+            m.set(i.address, [i]);
+        } 
+        else {
+            coll.push(i);
+        }
+    });
+    
+    //console.log(m);
+
+    // Reduce the groups to a single TxDetail, combining memos and summing amounts
+    const reducedDetailedTxns = [];
+        m.forEach((txns, toaddr) => {
+            const totalAmount = txns.reduce((sum, i) => sum + i.amount, 0);
+
+            const memos = txns
+            .filter(i => i.memos && i.memos.length > 0)
+            .map(i => {
+               const combinedMemo = i.memos
+               ?.filter(memo => memo)
+                .map(memo => {
+                    const rex = /\((\d+)\/(\d+)\)((.|[\r\n])*)/;
+                    const tags = memo.match(rex);
+                    if (tags && tags.length >= 4) {
+                       return { num: parseInt(tags[1], 10), memo: tags[3] };
+                    }
+
+                    // Just return as is
+                    return { num: 0, memo };
+                })
+                .sort((a, b) => a.num - b.num)
+                .map(a => a.memo);
+                return combinedMemo && combinedMemo.length > 0 ? combinedMemo.join('') : undefined;
+            })
+            .map(a => a);
+
+            const detail = {
+                address: toaddr,
+                amount: totalAmount,
+                memos: memos && memos.length > 0 ? [memos.join('')] : undefined,
+            };
+
+            //console.log(detail);
+
+            reducedDetailedTxns.push(detail);
+        });
+
+        //console.log(reducedDetailedTxns);
+
+        return reducedDetailedTxns;
+    }
+
+    // We combine detailed transactions if they are received to the same pool in the same txid. This
+    // is usually done to split long memos.
+    // Remember to add up both amounts and combine memos
+    combineTxDetailsByPool(txdetails) {
+        // First, group by pool.
+        const m = new Map();
+        txdetails
+        .filter(i => i.pool !== undefined)
+        .forEach(i => {
+            const coll = m.get(i.pool);
+            if (!coll) {
+                m.set(i.pool, [i]);
+            } 
+            else {
+                coll.push(i);
+            }
+        });
+
+        // Reduce the groups to a single TxDetail, combining memos and summing amounts
+        const reducedDetailedTxns = [];
+        m.forEach((txns, pool) => {
+            const totalAmount = txns.reduce((sum, i) => sum + i.amount, 0);
+
+            const memos = txns
+            .filter(i => i.memos && i.memos.length > 0)
+            .map(i => {
+                const combinedMemo = i.memos
+                ?.filter(memo => memo)
+                .map(memo => {
+                    const rex = /\((\d+)\/(\d+)\)((.|[\r\n])*)/;
+                    const tags = memo.match(rex);
+                    if (tags && tags.length >= 4) {
+                        return { num: parseInt(tags[1], 10), memo: tags[3] };
+                    }
+
+                    // Just return as is
+                    return { num: 0, memo };
+                })
+                .sort((a, b) => a.num - b.num)
+                .map(a => a.memo);
+                return combinedMemo && combinedMemo.length > 0 ? combinedMemo.join('') : undefined;
+            })
+            .map(a => a);
+
+            const detail = {
+                address: '',
+                amount: totalAmount,
+                memos: memos && memos.length > 0 ? [memos.join('')] : undefined,
+                pool: pool,
+            };
+
+            reducedDetailedTxns.push(detail);
+        });
+
+        return reducedDetailedTxns;
+    }
+
+
     async fetchTandZTransactions(latestBlockHeight) {    
         const list = await this.fetchTxList();
         
@@ -320,13 +541,13 @@ class LiteWallet {
                 // Finished processing
                 clearInterval(intervalID);
 
-                if(progress.txid) {
+                if(progress.txid && !progress.error) {
                     // And refresh data (full refresh)
                     this.refresh(true);
                     resolve(progress.txid);
                 }
 
-                if(progress.error) {
+                else {
                     reject(progress.error);
                 }
             }, 2 * 1000) // Every 2 seconds
@@ -630,8 +851,11 @@ class LiteWallet {
         return res;
     }
 
-    async getTransactionsList() {        
+    async getTransactionsList() {   
+        await this.fetchLatestBlockHeight();
+        await this.refresh(true);     
         await this.fetchTandZTransactions(this.lastBlockHeight);
+        // await this.fetchTandZandOTransactionsSummaries(this.lastBlockHeight);
         return this.transactionsList;
     }
 

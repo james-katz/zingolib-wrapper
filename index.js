@@ -18,7 +18,7 @@ client.init().then(async ()=> {
 
     // Get sync status
     const syncStatus = await client.getSyncStatus();
-    console.log(syncStatus);
+    console.log(syncStatus.in_progress);
 
     // Get last txid
     const txid = await client.fetchLastTxId();
@@ -28,6 +28,11 @@ client.init().then(async ()=> {
     const tx = await client.getTransactionsList();
     const lastTx = tx.filter((t) => t.txid === txid);
     console.log(lastTx[0].type);
+    
+    const s = await client.getTransactionsList();
+    s.forEach((el) => {
+        console.log(el);
+    })
 
     client.deinitialize();        
 }).catch((err) => {console.log(err)});
