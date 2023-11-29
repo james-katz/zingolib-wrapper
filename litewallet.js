@@ -107,6 +107,17 @@ class LiteWallet {
     async zingolibTxSummaries() {
         // fetch transaction summaries
         const txSummariesStr = await native.zingolib_execute_async("summaries", "");
+        
+        if(txSummariesStr) {
+            if (txSummariesStr.toLowerCase().startsWith('error')) {
+                console.log(`Error txs summaries ${txSummariesStr}`);
+                return {};
+            }
+        }
+        else {
+            console.log('Internal Error txs summaries');
+            return {};
+          }
         const txSummariesJSON = JSON.parse(txSummariesStr);
     
         return txSummariesJSON;
