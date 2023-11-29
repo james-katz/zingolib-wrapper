@@ -11,7 +11,7 @@ use neon::prelude::JsString;
 
 use neon::register_module;
 
-use zingoconfig::{self, construct_lightwalletd_uri, ChainType, ZingoConfig};
+use zingoconfig::{self, construct_lightwalletd_uri, ChainType, RegtestNetwork, ZingoConfig};
 use zingolib::{commands, lightclient::LightClient, wallet::WalletBase};
 
 use std::sync::RwLock;
@@ -39,6 +39,7 @@ register_module!(mut m, {
     m.export_function("zingolib_deinitialize", zingolib_deinitialize)?;
     m.export_function("zingolib_execute_spawn", zingolib_execute_spawn)?;
     m.export_function("zingolib_execute_async", zingolib_execute_async)?;
+    m.export_function("zingolib_server_uri_latency", zingolib_server_uri_latency)?;
 
     Ok(())
 });
@@ -48,11 +49,27 @@ fn get_chainnym(chain_hint_str: &str) -> Result<ChainType, String> {
     let result = match chain_hint_str {
         "main" => ChainType::Mainnet,
         "test" => ChainType::Testnet,
-        "regtest" => ChainType::Regtest,
+        "regtest" => ChainType::Regtest(RegtestNetwork::all_upgrades_active()),
         _ => return Err("Not a valid chain hint!".to_string()),
     };
     
     Ok(result)
+}
+
+// check the latency of a server
+fn zingolib_server_uri_latency(mut cx: FunctionContext) -> JsResult<JsString> {
+    let server_uri = cx.argument::<JsString>(0)?.value(&mut cx);
+
+    let server = construct_lightwalletd_uri(Some(server_uri));
+    let block_height = match zingolib::get_latest_block_height(server.clone())
+    {
+        Ok(height) => height,
+        Err(e) => {
+            return Ok(cx.string(format!("Error: {}", e)));
+        }
+    };
+    
+    Ok(cx.string(block_height.to_string()))
 }
 
 // Check if there is an existing wallet
@@ -66,7 +83,7 @@ fn zingolib_wallet_exists(mut cx: FunctionContext) -> JsResult<JsBoolean> {
     };
     let config = ZingoConfig::create_unconnected(chaintype, None);
 
-    Ok(cx.boolean(config.wallet_exists()))
+    Ok(cx.boolean(config.wallet_path_exists()))
 }
 
 /// Create a new wallet and return the seed for the newly created wallet.

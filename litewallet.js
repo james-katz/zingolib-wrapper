@@ -145,11 +145,16 @@ class LiteWallet {
             if (!currentTxList[0].type && !!type) {
                 currentTxList[0].type = type;
             }
-            if (!currentTxList[0].confirmations) {
+            // unconfirmed means 0 confirmations, the tx is mining already.
+            if (tx.unconfirmed) {
+             currentTxList[0].confirmations = null;
+            } 
+            else if (!currentTxList[0].confirmations) {
                 currentTxList[0].confirmations = latestBlockHeight
                 ? latestBlockHeight - tx.block_height + 1
                 : 0;
             }
+            
             if (!currentTxList[0].txid && !!tx.txid) {
                 currentTxList[0].txid = tx.txid;
             }
