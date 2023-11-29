@@ -4,6 +4,7 @@ const Litewallet = require('./litewallet');
 const client = new Litewallet("https://mainnet.lightwalletd.com:9067/", "main");
 
 client.init().then(async ()=> {
+    console.log("\n\n\n==============\n\n\n")
     // Fetch wallet balance
     const bal = await client.fetchTotalBalance();
     console.log(bal);
@@ -29,10 +30,10 @@ client.init().then(async ()=> {
     const lastTx = tx.filter((t) => t.txid === txid);
     console.log(lastTx[0].type);
     
-    const s = await client.getTransactionsList();
-    s.forEach((el) => {
-        console.log(el);
-    })
+    // const s = await client.getTransactionsList();
+    // s.forEach((el) => {
+    //     console.log(el);
+    // })
 
     client.deinitialize();        
 }).catch((err) => {console.log(err)});

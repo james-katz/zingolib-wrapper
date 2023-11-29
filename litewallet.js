@@ -69,8 +69,9 @@ class LiteWallet {
                     this.lastTxId = this.fetchLastTxId();
                     await native.zingolib_execute_async('save','');
 
-                    this.fetchTandZTransactions(this.lastBlockHeight);
-                    
+                    // this.fetchTandZTransactions(this.lastBlockHeight);
+                    await this.fetchTandZandOTransactionsSummaries(this.lastBlockHeight);
+
                     this.doRefreshAndUpdateData();
                     resolve('OK');
                 }                    
@@ -466,7 +467,9 @@ class LiteWallet {
             this.lastBlockHeight = await this.fetchLatestBlockHeight();
             this.lastTxId = latestTxId;        
             
-            await this.fetchTandZTransactions(this.lastBlockHeight);
+            // await this.fetchTandZTransactions(this.lastBlockHeight);
+            await this.fetchTandZandOTransactionsSummaries(this.lastBlockHeight);
+
         }
 
         this.updateDataLock = false;
@@ -498,7 +501,8 @@ class LiteWallet {
 
                     console.log('Wallet is up to date!');
 
-                    await this.fetchTandZTransactions(latestBlockHeight);
+                    // await this.fetchTandZTransactions(latestBlockHeight);
+                    await this.fetchTandZandOTransactionsSummaries(latestBlockHeight);
 
                     this.lastBlockHeight = latestBlockHeight;
 
@@ -512,8 +516,10 @@ class LiteWallet {
                         clearInterval(this.syncTimerID);
                         this.syncTimerID = undefined;
 
-                        this.fetchTotalBalance();
-                        this.fetchTandZTransactions(latestBlockHeight);
+                        // await this.fetchTotalBalance();
+                        // this.fetchTandZTransactions(latestBlockHeight);
+                        await this.fetchTandZandOTransactionsSummaries(latestBlockHeight);
+
 
                         this.lastBlockHeight = latestBlockHeight;
 
@@ -870,8 +876,8 @@ class LiteWallet {
     async getTransactionsList() {   
         await this.fetchLatestBlockHeight();
         await this.refresh(true);     
-        await this.fetchTandZTransactions(this.lastBlockHeight);
-        // await this.fetchTandZandOTransactionsSummaries(this.lastBlockHeight);
+        // await this.fetchTandZTransactions(this.lastBlockHeight);
+        await this.fetchTandZandOTransactionsSummaries(this.lastBlockHeight);
         return this.transactionsList;
     }
 
@@ -886,13 +892,16 @@ class LiteWallet {
     }
 
     async fetchLastTxId() {
-        const txListStr = await native.zingolib_execute_async("list", "");
+        const txListStr = await native.zingolib_execute_async("summaries", "");
         const txListJSON = JSON.parse(txListStr);
+
+        // console.log('=============== get Last TX ID', txListJSON.length); 
 
         if (txListJSON && txListJSON.length && txListJSON.length > 0) {
             return txListJSON[txListJSON.length - 1].txid;
-        } else {
-            return '0';
+        }
+        else {
+            return "0";
         }
     }
 
