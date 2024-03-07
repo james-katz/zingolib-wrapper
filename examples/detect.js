@@ -1,7 +1,7 @@
-const Litewallet = require('../litewallet');
+const Litewallet = require('../zingo_litewallet');
 const { PaymentDetect } = require('../utils/utils');
 
-const client = new Litewallet("https://mainnet.lightwalletd.com:9067/");
+const client = new Litewallet("https://lwd6.zcash-infra.com:9067");
 
 client.init().then(()=> {
     const pd = new PaymentDetect(client);

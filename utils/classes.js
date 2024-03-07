@@ -2,7 +2,8 @@ class TxDetail {
     constructor() {
         this.address = "";
         this.amount = "";
-        this.memo = null;
+        this.memos = null;
+        this.pool = "";
       }
 }
 
@@ -21,23 +22,22 @@ class Transaction {
 
 class TotalBalance {
     constructor() {
-        this.sapling_balance = 0;
-        this.verified_sapling_balance = 0;
-        this.spendable_sapling_balance = 0;
-        this.unverified_sapling_balance = 0;
-        this.orchard_balance = 0;
-        this.verified_orchard_balance = 0;
-        this.spendable_orchard_balance = 0;
-        this.unverified_orchard_balance = 0;
-        this.transparent_balance = 0;
+        this.orchardBal = 0;
+        this.privateBal = 0;
+        this.transparentBal = 0;
+        this.spendableOrchard = 0;
+        this.spendablePrivate = 0;
         this.total = 0;
     }
 }
 
 class Address {
-    constructor(address, receivers) {
+    constructor(uaAddress, address, addressKind, receivers) {
+        this.uaAddress = uaAddress;
         this.address = address;
+        this.addressKind = addressKind;
         this.receivers = receivers;
+        this.containsPending = false;  
     }
 }
 
@@ -58,18 +58,16 @@ class WalletSettings {
 
 class Info {
     constructor() {
-        this.testnet = false;
+        this.chain_name = "";
         this.latestBlock = 0;
+        this.serverUri = "";
         this.connections = 0;
-        this.version = "";
-        this.zcashdVersion = "";
+        this.version = "0";
         this.verificationProgress = 0;
         this.currencyName = "";
         this.solps = 0;
-        this.zecPrice = 0;
-        this.encrypted = false;
-        this.locked = false;
-        this.walletHeight = 0;
+        this.defaultFee = 0;
+        this.zingolib = "";        
     }
 }
 

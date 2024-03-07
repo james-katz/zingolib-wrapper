@@ -17,10 +17,6 @@ client.init().then(async ()=> {
     const addrsbal = await client.fetchAddressesWithBalance();
     console.log(addrsbal);
 
-    // Get sync status
-    const syncStatus = await client.getSyncStatus();
-    console.log(syncStatus.in_progress);
-
     // Get last txid
     const txid = await client.fetchLastTxId();
     console.log(txid);
@@ -30,10 +26,5 @@ client.init().then(async ()=> {
     const lastTx = tx.filter((t) => t.txid === txid);
     console.log(lastTx[0].type);
     
-    // const s = await client.getTransactionsList();
-    // s.forEach((el) => {
-    //     console.log(el);
-    // })
-
     client.deinitialize();        
 }).catch((err) => {console.log(err)});

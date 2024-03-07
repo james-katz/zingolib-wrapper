@@ -11,7 +11,7 @@ use neon::prelude::JsString;
 
 use neon::register_module;
 
-use zingoconfig::{self, construct_lightwalletd_uri, ChainType, RegtestNetwork, ZingoConfig};
+use zingoconfig::{construct_lightwalletd_uri, ChainType, RegtestNetwork, ZingoConfig};
 use zingolib::{commands, lightclient::LightClient, wallet::WalletBase};
 
 use std::sync::RwLock;
@@ -81,7 +81,7 @@ fn zingolib_wallet_exists(mut cx: FunctionContext) -> JsResult<JsBoolean> {
         Ok(c) => c,
         Err(_) => return Ok(cx.boolean(false)),
     };
-    let config = ZingoConfig::create_unconnected(chaintype, None);
+    let config = ZingoConfig::build(chaintype).create();
 
     Ok(cx.boolean(config.wallet_path_exists()))
 }
@@ -108,7 +108,7 @@ fn zingolib_initialize_new(mut cx: FunctionContext) -> JsResult<JsString> {
             }
         };
 
-        let config = match zingolib::load_clientconfig(server, None, chaintype, false) {
+        let config = match zingoconfig::load_clientconfig(server, None, chaintype, false) {
             Ok(c) => c,
             Err(e) => {
                 return format!("Error: {}", e);
@@ -153,7 +153,7 @@ fn zingolib_initialize_new_from_phrase(mut cx: FunctionContext) -> JsResult<JsSt
             }
         };
 
-        let config = match zingolib::load_clientconfig(server, None, chaintype, false) {
+        let config = match zingoconfig::load_clientconfig(server, None, chaintype, false) {
             Ok(c) => c,
             Err(e) => {
                 return format!("Error: {}", e);
@@ -202,7 +202,7 @@ fn zingolib_initialize_new_from_ufvk(mut cx: FunctionContext) -> JsResult<JsStri
             }
         };
 
-        let config = match zingolib::load_clientconfig(server, None, chaintype, false) {
+        let config = match zingoconfig::load_clientconfig(server, None, chaintype, false) {
             Ok(c) => c,
             Err(e) => {
                 return format!("Error: {}", e);
@@ -249,7 +249,7 @@ fn zingolib_initialize_existing(mut cx: FunctionContext) -> JsResult<JsString> {
             }
         };
 
-        let config = match zingolib::load_clientconfig(server, None, chaintype, false) {
+        let config = match zingoconfig::load_clientconfig(server, None, chaintype, false) {
             Ok(c) => c,
             Err(e) => {
                 return format!("Error: {}", e);

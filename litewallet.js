@@ -646,7 +646,7 @@ class LiteWallet {
     async fetchTotalBalance() {
         const balanceJSON = JSON.parse(await native.zingolib_execute_async('balance',''));        
         const balance = new TotalBalance();
-
+        console.log(balanceJSON)
         // Every sapling balance
         balance.sapling_balance = balanceJSON.sapling_balance / 10 ** 8;
         balance.verified_sapling_balance = balanceJSON.verified_sapling_balance / 10 ** 8;
