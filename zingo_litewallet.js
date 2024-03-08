@@ -85,22 +85,22 @@ class LiteWallet {
             if (!this.refreshTimerID) {
                 this.refreshTimerID = setInterval(() => {
                     //console.log('interval refresh');
-                    this.refresh(false, false);
+                    this.refreshSimple(false);
                 }, 30 * 1000); // 30 seconds
                 //console.log('create refresh timer', this.refreshTimerID);
                 this.timers.push(this.refreshTimerID);
             }
 
             // every 5 seconds the App update all data
-            if (!this.updateTimerID) {
-                this.updateTimerID = setInterval(() => {
-                    //console.log('interval update', this.timers);
-                    this.sanitizeTimers();
-                    this.updateData();
-                }, 5 * 1000); // 5 secs
-                //console.log('create update timer', this.updateTimerID);
-                this.timers.push(this.updateTimerID);
-            }
+            // if (!this.updateTimerID) {
+            //     this.updateTimerID = setInterval(() => {
+            //         //console.log('interval update', this.timers);
+            //         this.sanitizeTimers();
+            //         this.updateData();
+            //     }, 5 * 1000); // 5 secs
+            //     //console.log('create update timer', this.updateTimerID);
+            //     this.timers.push(this.updateTimerID);
+            // }
 
             // and now the array of timers...
             let deleted = [];
@@ -938,6 +938,63 @@ class LiteWallet {
                 syncProcessStalled: false,
             };
         }
+    }
+
+    async refreshSimple(fullRefresh) {
+        if (this.syncTimerID) {
+            console.log("Already have a sync process launched", this.syncTimerID);
+            return;
+        }     
+
+        await this.fetchWalletHeight();
+        await this.fetchInfoAndServerHeight();
+        this.loadWalletData();
+        
+        if(!this.lastWalletBlockHeight || this.lastWalletBlockHeight < this.lastServerBlockHeight || fullRefresh) {
+            console.log('Refreshing wallet: ' + (this.lastServerBlockHeight - this.lastWalletBlockHeight) + ' new blocks.');
+            
+            this.updateDataLock = true;
+            this.inRefresh = true;
+            native.zingolib_execute_spawn('sync', '');
+            let retryCount = 0;
+
+            this.syncTimerID = setInterval(async () => {
+                await this.fetchWalletHeight();
+                await this.fetchInfoAndServerHeight();
+                // retryCount ++;
+
+                if(retryCount > 30 || this.lastWalletBlockHeight >= this.lastServerBlockHeight) {                    
+                    clearInterval(this.syncTimerID);
+                    this.syncTimerID = undefined;
+
+                    console.log('Wallet is up to date!');
+
+                    await this.loadWalletData();
+
+                    this.lastBlockHeight = this.lastServerBlockHeight;
+
+                    await this.rpc_doSave();
+                    this.updateDataLock = false;
+                }
+                else {
+                    const ssStr = await this.doSyncStatus();
+                    const ss = JSON.parse(ssStr);
+                    if (!ss.in_progress) {
+                        clearInterval(this.syncTimerID);
+                        this.syncTimerID = undefined;
+
+                        await this.loadWalletData();
+
+                        this.lastWalletBlockHeight = this.lastServerBlockHeight;
+                        this.inRefresh = false;
+
+                        await this.rpc_doSave();
+                        this.updateDataLock = false;
+                    }
+                }                
+            }, 5000);
+        }
+        else console.log('no new blocks');
     }
 
     async fetchNotes() {
