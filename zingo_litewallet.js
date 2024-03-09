@@ -947,8 +947,11 @@ class LiteWallet {
         }     
 
         await this.fetchWalletHeight();
+        // await this.fetchWalletBirthday();
         await this.fetchInfoAndServerHeight();
-        this.loadWalletData();
+    
+        // And fetch the rest of the data.
+        await this.loadWalletData();
         
         if(!this.lastWalletBlockHeight || this.lastWalletBlockHeight < this.lastServerBlockHeight || fullRefresh) {
             console.log('Refreshing wallet: ' + (this.lastServerBlockHeight - this.lastWalletBlockHeight) + ' new blocks.');
@@ -972,6 +975,7 @@ class LiteWallet {
                     await this.loadWalletData();
 
                     this.lastBlockHeight = this.lastServerBlockHeight;
+                    this.inRefresh = false;
 
                     await this.rpc_doSave();
                     this.updateDataLock = false;
@@ -1347,13 +1351,13 @@ class LiteWallet {
                 const progressStr = await this.doSendProgress();
                 const progress = JSON.parse(progressStr);
 
-                if(progress.id === prevSendId) {
+                this.inSend = progress.sending;
+
+                if(this.inSend && progress.id === prevSendId) {
                     // Still not started, so wait for more time
                     console.log('waiting')
                     return;
                 }
-
-                this.inSend = progress.sending;
 
                 if (!progress.txid && !progress.error) {
                     // Still processing                   
