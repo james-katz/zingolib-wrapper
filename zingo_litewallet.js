@@ -91,16 +91,16 @@ class LiteWallet {
                 this.timers.push(this.refreshTimerID);
             }
 
-            // every 5 seconds the App update all data
-            // if (!this.updateTimerID) {
-            //     this.updateTimerID = setInterval(() => {
-            //         //console.log('interval update', this.timers);
-            //         this.sanitizeTimers();
-            //         this.updateData();
-            //     }, 5 * 1000); // 5 secs
-            //     //console.log('create update timer', this.updateTimerID);
-            //     this.timers.push(this.updateTimerID);
-            // }
+            // every 15 seconds the App update all data
+            if (!this.updateTimerID) {
+                this.updateTimerID = setInterval(() => {
+                    //console.log('interval update', this.timers);
+                    this.sanitizeTimers();
+                    this.updateData();
+                }, 15 * 1000); // 15 secs
+                //console.log('create update timer', this.updateTimerID);
+                this.timers.push(this.updateTimerID);
+            }
 
             // and now the array of timers...
             let deleted = [];
@@ -944,7 +944,12 @@ class LiteWallet {
         if (this.syncTimerID) {
             console.log("Already have a sync process launched", this.syncTimerID);
             return;
-        }     
+        }
+
+        if(this.inSend) {
+            console.log("Wallet is sending, will sync after send is done.");
+            return;
+        }
 
         await this.fetchWalletHeight();
         // await this.fetchWalletBirthday();
@@ -996,7 +1001,7 @@ class LiteWallet {
                         this.updateDataLock = false;
                     }
                 }                
-            }, 5000);
+            }, 2000);
         }
         else console.log('no new blocks');
     }
@@ -1454,7 +1459,8 @@ class LiteWallet {
         }
     }
 
-    getDefaultFee() {
+    async getDefaultFee() {
+        await this.fetchInfoAndServerHeight();
         return this.infoObject.defaultFee || 0.00001;
     }
 
