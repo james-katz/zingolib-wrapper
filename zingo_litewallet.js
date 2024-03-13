@@ -447,7 +447,7 @@ class LiteWallet {
             await this.rpc_setInterruptSyncAfterBatch('true');
     
             // sleep for half second
-            // await this.sleep(500);
+            await this.sleep(500);
     
             returnStatus = await this.doSyncStatus();
             ss = await JSON.parse(returnStatus);
@@ -941,8 +941,8 @@ class LiteWallet {
     }
 
     async refreshSimple(fullRefresh) {
-        if (this.syncTimerID) {
-            console.log("Already have a sync process launched", this.syncTimerID);
+        if (this.syncStatusTimerID) {
+            console.log("Already have a sync process launched", this.syncStatusTimerID);
             return;
         }
 
@@ -966,14 +966,14 @@ class LiteWallet {
             native.zingolib_execute_spawn('sync', '');
             let retryCount = 0;
 
-            this.syncTimerID = setInterval(async () => {
+            this.syncStatusTimerID = setInterval(async () => {
                 await this.fetchWalletHeight();
                 await this.fetchInfoAndServerHeight();
                 // retryCount ++;
 
                 if(retryCount > 30 || this.lastWalletBlockHeight >= this.lastServerBlockHeight) {                    
-                    clearInterval(this.syncTimerID);
-                    this.syncTimerID = undefined;
+                    clearInterval(this.syncStatusTimerID);
+                    this.syncStatusTimerID = undefined;
 
                     console.log('Wallet is up to date!');
 
@@ -989,8 +989,8 @@ class LiteWallet {
                     const ssStr = await this.doSyncStatus();
                     const ss = JSON.parse(ssStr);
                     if (!ss.in_progress) {
-                        clearInterval(this.syncTimerID);
-                        this.syncTimerID = undefined;
+                        clearInterval(this.syncStatusTimerID);
+                        this.syncStatusTimerID = undefined;
 
                         await this.loadWalletData();
 
