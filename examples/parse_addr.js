@@ -1,6 +1,6 @@
-const Litewallet = require('../zingo_litewallet');
+const Litewallet = require('../zingolib');
 
-const client = new Litewallet("https://mainnet.lightwalletd.com:9067/", "main", false);
+const client = new Litewallet("https://zec.rocks:443", "main");
 
 client.init().then(async ()=> {   
     let addr = await client.parseAddress("u12263wg70fvfenrmlyu79tf6zrmvl7dez8spava74v6glwkkzkgkwvjs5pzh7sf0nv0xy26juuc7gqd3d444vwvn64768vhj8lystumugrd54lx8a0y5rsudpgau7gmfwfvpuqx07t6as98lqt4xtfgnpzrat29m8qq6x3h2mg44enqztd2mmyvlqr500dyua8270v94hykuk5jhhcey");

@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "description": "Zingolib wrapper library",
   "main": "index.js",
+  
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "build": "npm run neon",
@@ -12,8 +13,5 @@
   "license": "MIT",
   "devDependencies": {
     "cargo-cp-artifact": "^0.1"
-  },
-  "dependencies": {
-    "axios": "^1.4.0"
   }
 }
