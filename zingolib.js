@@ -14,7 +14,7 @@ class ZingoLib {
     }
 
     async init() {
-        return new Promise(async (resolve, reject) => {
+        return new Promise(async (resolve, reject) => {            
             if (native.zingolib_wallet_exists('https://zec.rocks:443', 'main')) {
                 const wallet = native.zingolib_init_from_b64(this.serveruri, 'main');
                 if (wallet && !wallet.toLowerCase().startsWith('error')) {
@@ -41,8 +41,22 @@ class ZingoLib {
         });
     }
 
-    async restore(uri, seed, birthday) {
-
+    async restore(seed, birthday) {
+        return new Promise((resolve, reject) => {
+            if(seed) {            
+                console.log("Trying to initialize wallet from seed ...")
+                const res = native.zingolib_init_from_seed(this.serveruri, seed, birthday, this.chain);
+                if(!res.toLowerCase().startsWith('error')) {
+                    const seedJson = JSON.parse(res);
+                    console.log(`Seed imported, will sync from height ${birthday}`);
+                    resolve(seedJson);
+                }
+                else {
+                    console.log("Error initializing from seed");
+                    reject(seed);
+                }
+            }
+        });        
     }
 
     async sleep(ms) {
@@ -461,9 +475,27 @@ class ZingoLib {
         const feeStr = await native.zingolib_execute_async('defaultfee', '');
         if(feeStr) {
             const feeJson = JSON.parse(feeStr);
-            return feeJson.defaultfee;
+            return parseFloat((feeJson.defaultfee / 10**8).toFixed(8));
         }
-        else return 10000;
+        else return 10000; // Fail safe
+    }
+
+    async getWalletSeed() {
+        const seedStr = await native.zingolib_execute_async('seed', '');
+        if(seedStr) {
+            const seedJson = JSON.parse(seedStr);
+            return seedJson;
+        }
+        else return "Error: Couldn't get wallet seed.";
+    }
+
+    async exportWalletUfvk() {
+        const ufvkStr = await native.zingolib_execute_async('exportufvk', '');
+        if(ufvkStr) {
+            const ufvkJson = JSON.parse(ufvkStr);
+            return ufvkJson;
+        }
+        else return "Error: Couldn't get wallet ufvk.";
     }
 
     async parseAddress(addr) {

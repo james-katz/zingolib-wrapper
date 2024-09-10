@@ -39,5 +39,9 @@ client.init().then(async (res)=> {
     // const txns = await client.getTransactionsSummaries();    
     // console.log(txns);
 
+    // Get the wallet seed
+    const seed = await client.getWalletSeed();    
+    console.log(seed);
+
     client.deinitialize();        
 }).catch((err) => {console.log(err)});
