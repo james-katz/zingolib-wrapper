@@ -471,7 +471,7 @@ class ZingoLib {
         // else return -1;
         const txList = await native.zingolib_get_transaction_summaries();
         const txListJson = JSON.parse(txList);
-        if(txListJson) {
+        if(txListJson && txListJson.length > 0) {
             // console.log(txListJson.transaction_summaries)
             return txListJson.transaction_summaries[txListJson.transaction_summaries.length - 1].txid;
         }
