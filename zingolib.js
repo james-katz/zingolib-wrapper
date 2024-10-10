@@ -463,10 +463,17 @@ class ZingoLib {
         }
     }
 
-    fetchLastTxId() {
-        const txList = this.getTransactions();
-        if(txList) {
-            return txList.value_transfers[txList.value_transfers.length - 1].txid;
+    async fetchLastTxId() {
+        // const txList = this.getTransactions();
+        // if(txList) {
+        //     return txList.value_transfers[txList.value_transfers.length - 1].txid;
+        // }
+        // else return -1;
+        const txList = await native.zingolib_get_transaction_summaries();
+        const txListJson = JSON.parse(txList);
+        if(txListJson) {
+            // console.log(txListJson.transaction_summaries)
+            return txListJson.transaction_summaries[txListJson.transaction_summaries.length - 1].txid;
         }
         else return -1;
     }
@@ -489,7 +496,7 @@ class ZingoLib {
         else return "Error: Couldn't get wallet seed.";
     }
 
-    async exportWalletUfvk() {
+    async getWalletUfvk() {
         const ufvkStr = await native.zingolib_execute_async('exportufvk', '');
         if(ufvkStr) {
             const ufvkJson = JSON.parse(ufvkStr);

@@ -151,27 +151,52 @@ class PaymentDetect extends EventEmitter {
         this.lastTxId = await this.client.fetchLastTxId();
 
         const timer = setInterval(async ()=> {
-            const lastTx = await this.client.fetchLastTxId();  
-
-            if(lastTx !== this.lastTxId) {                
+            const lastTx = await this.client.fetchLastTxId();              
+            
+            if(lastTx == -1) {
+                console.log("txid error")
+            }
+            else if(lastTx != this.lastTxId) {                
                 const txList = [];
                 try {
                     const tx = await this.client.getTransactionsSummaries();
-                    const txDetail = tx.transaction_summaries.filter((t) => t.kind === 'received');                                        
-                    for(var i = 0; i < txDetail.length; i ++) {                                                
-                        if(txDetail[i].txid === this.lastTxId) {
-                            console.log(`Detected ${i} new payments`);                            
-                            break;
-                        }
-                        
-                        txList.push(txDetail[i]);
-                    }                    
-                    if(txList.length > 0) this.emit("payments", txList);
+                    const txDetail = tx.transaction_summaries.filter((t) => t.kind == 'received').reverse();
+                    
+                    if(txDetail.length > 0) {
+                        for(var i = 0; i < txDetail.length; i ++) {                                                
+                        //    console.log(txDetail[i].txid)
+                            if(txDetail[i].txid == this.lastTxId) {
+                                break;
+                            }
+                            
+                            txList.push(txDetail[i]);
+                        }         
+                    }
+
+                    if(txList.length > 0) {
+                        console.log(`Detected ${txList.length} new payments`);                            
+                        this.emit("payments", txList);
+                    }
                 } catch(err) { console.log(err) }  
                 
                 this.lastTxId = lastTx;              
             }
+            else {
+                // const tx = await this.client.getTransactionsSummaries();
+
+                // const txDetail = tx.transaction_summaries.filter((t) => t.kind == 'received').reverse().flat();
+
+                // // const txDetail = tx.transaction_summaries.reverse().flat();
+
+                // console.log(this.lastTxId)
+                // console.log(lastTx)
+                // console.log(txDetail[0]);
+            }
         }, interval);
+    }
+
+    setLastTxId(txid) {
+        this.lastTx = txid;
     }
 }
 
