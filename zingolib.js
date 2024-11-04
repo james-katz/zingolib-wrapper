@@ -1,9 +1,10 @@
 const native = require('./native.node');
 
 class ZingoLib {
-    constructor(uri, chain) {
+    constructor(uri, chain, monitorMempool) {
         this.serveruri = uri;
         this.chain = chain;
+        this.monitorMempool = monitorMempool;
 
         this.syncInterval;
         this.syncStatusInterval;
@@ -15,8 +16,8 @@ class ZingoLib {
 
     async init() {
         return new Promise(async (resolve, reject) => {            
-            if (native.zingolib_wallet_exists('https://zec.rocks:443', 'main')) {
-                const wallet = native.zingolib_init_from_b64(this.serveruri, 'main');
+            if (native.zingolib_wallet_exists(this.serveruri, 'main')) {
+                const wallet = native.zingolib_init_from_b64(this.serveruri, 'main', this.monitorMempool);
                 if (wallet && !wallet.toLowerCase().startsWith('error')) {
                     console.log("Initializing existing wallet.");
                 }
@@ -27,8 +28,9 @@ class ZingoLib {
             }
             else {
                 console.log("No wallet configured, creating a new one.");
-                const seed = native.zingolib_init_new(this.serveruri, 'main', true);
-                if (seed && !seed.toLowerCase().startsWith('error')) {
+                const res = native.zingolib_init_new(this.serveruri, 'main', this.monitorMempool);
+                if (res && !res.toLowerCase().startsWith('error')) {
+                    const seed = await this.getWalletSeed();
                     console.log('Created new wallet, please save the seed:', seed);
                 }
                 else {
@@ -45,15 +47,33 @@ class ZingoLib {
         return new Promise((resolve, reject) => {
             if(seed) {            
                 console.log("Trying to initialize wallet from seed ...")
-                const res = native.zingolib_init_from_seed(this.serveruri, seed, birthday, this.chain);
+                const res = native.zingolib_init_from_seed(this.serveruri, seed, birthday, this.chain, this.monitorMempool);
                 if(!res.toLowerCase().startsWith('error')) {
-                    const seedJson = JSON.parse(res);
+                    // const seedJson = JSON.parse(res);
                     console.log(`Seed imported, will sync from height ${birthday}`);
-                    resolve(seedJson);
+                    resolve(res);
                 }
                 else {
                     console.log("Error initializing from seed");
                     reject(seed);
+                }
+            }
+        });        
+    }
+
+    async from_ufvk(ufvk, birthday) {
+        return new Promise((resolve, reject) => {
+            if(ufvk) {            
+                console.log("Trying to initialize wallet from ufvk (watch only) ...")
+                const res = native.zingolib_init_from_ufvk(this.serveruri, ufvk, birthday, this.chain, this.monitorMempool);
+                if(!res.toLowerCase().startsWith('error')) {
+                    const ufvkRes = res;
+                    console.log(`ufvk imported, will sync from height ${birthday}`);
+                    resolve(ufvkRes);
+                }
+                else {
+                    console.log("Error initializing from ufvk:");
+                    reject(res);
                 }
             }
         });        
@@ -68,7 +88,7 @@ class ZingoLib {
     async configure() {
         try {
             await this.stopSyncProcess();
-            // await this.fetchInfoAndServerHeight();
+            await this.fetchInfoAndServerHeight();
 
             // Save wallet
             // const res = native.saveWallet();
@@ -76,10 +96,13 @@ class ZingoLib {
             //     console.log("Error saving wallet");
             // }
 
-            // Refresh wallet every 30 seconds
+            // Do initial sync
+            this.doRefresh(false);
+
+            // Refresh wallet every 75 seconds
             this.syncInterval = setInterval(() => {
                 this.doRefresh(false);
-            }, 30 * 1000);
+            }, 75 * 1000);
         }
         catch (e) {
             console.log("Couldn't configure the wallet", e);
@@ -143,7 +166,10 @@ class ZingoLib {
 
     async doRefresh(fullRefresh) {
         if (this.syncStatusInterval) {
-            console.log("Already have a sync process launched.");
+            this.fetchWalletHeight();
+
+            console.log(`Already have a sync process launched. Wallet height is ${this.lastWalletBlockHeight}`);
+            
             return;
         }
 
@@ -184,7 +210,7 @@ class ZingoLib {
                         clearInterval(this.syncStatusInterval);
                         this.syncStatusInterval = undefined;
 
-                        console.log("Wallet is up to date!");
+                        console.log("Wallet sync was interrupted ...");
 
                         this.lastBlockHeight = this.lastServerBlockHeight;
                         this.inRefresh = false;
@@ -221,17 +247,20 @@ class ZingoLib {
                 return;
             }
             const heightJSON = JSON.parse(heightStr);
-            this.lastWalletBlockHeight = heightJSON.height;
+            this.lastWalletBlockHeight = heightJSON.height;            
         }
         catch (error) {
             console.log(`Critical Error wallet height ${error}`);
             return;
         }
-    }
+        
+        return this.lastWalletBlockHeight;
+    }   
 
     async fetchTotalBalance() {
         try {
             const balStr = await native.zingolib_execute_async('balance', '');
+            console.log(balStr);
             if (balStr) {
                 if (balStr.toLowerCase().startsWith('error')) {
                     console.log(`Error wallet balance ${balStr}`);
@@ -241,9 +270,43 @@ class ZingoLib {
                 console.log('Internal Error wallet balance');
                 return 0;
             }
-            const balJson = JSON.parse(balStr);
-            const totalBal = (balJson.spendable_sapling_balance + balJson.spendable_orchard_balance + balJson.transparent_balance) / 10**8;
+            const balJson = JSON.parse(balStr);     
+            
+            // const cleanedString = balStr
+            //     .replace(/[\[\]]/g, '')                
+            //     .replace(/(\s*\w+:\s*[\d_]+)/g, '$1,')
+            //     .replace(/(\w+):/g, '"$1":')
+            //     .replace(/_/g, '')
+            //     .replace(/,\s*$/, '') // Remove trailing comma
+            //     .trim(); // Trim any remaining whitespace or line breaks
+            // const balJson = JSON.parse(`{${cleanedString}}`);
+            // // console.log(balJson)  
+
+            const totalBal = (balJson.sapling_balance + balJson.orchard_balance + balJson.transparent_balance) / 10**8;
             return totalBal;
+        }
+        catch (error) {
+            console.log(`Critical Error wallet balance ${error}`);
+            return;
+        }
+    }
+
+    async fetchSpendableBalance() {
+        try {
+            const balStr = await native.zingolib_execute_async('spendablebalance', '');
+            if (balStr) {
+                if (balStr.toLowerCase().startsWith('error')) {
+                    console.log(`Error wallet balance ${balStr}`);
+                    return 0;
+                }
+            } else {
+                console.log('Internal Error wallet balance');
+                return 0;
+            }
+            const balJson = JSON.parse(balStr);     
+            console.log(balJson)       
+            // const totalBal = (balJson.sapling_balance + balJson.orchard_balance + balJson.transparent_balance) / 10**8;
+            // return totalBal;
         }
         catch (error) {
             console.log(`Critical Error wallet balance ${error}`);
@@ -306,7 +369,7 @@ class ZingoLib {
                     .reduce((acc, curr) => acc + curr.value, 0);
 
                 // Sum of sapling notes   
-                const saplingValue = notes.pending_sapling_notes
+                const saplingValue = notes.unspent_sapling_notes
                     .filter((n) => n.address == addr.address)
                     .reduce((acc, curr) => acc + curr.value, 0);
 
@@ -327,6 +390,31 @@ class ZingoLib {
         }
 
         return ab;
+    }
+
+    async getAddressAndValueFromTx(tx) {
+        const allNotes = await this.fetchNotes();
+        let notes = [];
+        const txid = tx.txid.toString();
+        // Try orchard notes
+        notes = allNotes.unspent_orchard_notes.filter((n) => n.created_in_txid == txid);
+        if(notes.length == 0) notes = allNotes.pending_orchard_notes.filter((n) => n.created_in_txid == txid);
+    
+        // Try sapling notes
+        if(notes.length == 0) notes = allNotes.unspent_sapling_notes.filter((n) => n.created_in_txid == txid);
+        if(notes.length == 0) notes = allNotes.pending_sapling_notes.filter((n) => n.created_in_txid == txid);
+
+        // Try transparent utxos
+        if(notes.length == 0) notes = allNotes.utxos.filter((n) => n.created_in_txid == txid);
+        if(notes.length == 0) notes = allNotes.pending_utxos.filter((n) => n.created_in_txid == txid);
+        
+        const addrAndValue = notes.map((el) => {
+            return {
+                address: el.address,
+                value: el.value,
+            }
+        });
+        return addrAndValue;
     }
 
     async sendTransaction(sendJson) {
@@ -463,15 +551,9 @@ class ZingoLib {
         }
     }
 
-    async fetchLastTxId() {
-        // const txList = this.getTransactions();
-        // if(txList) {
-        //     return txList.value_transfers[txList.value_transfers.length - 1].txid;
-        // }
-        // else return -1;
-        const txList = await native.zingolib_get_transaction_summaries();
-        const txListJson = JSON.parse(txList);
-        if(txListJson && txListJson.length > 0) {
+    fetchLastTxId() {        
+        const txListJson =  this.getTransactionsSummaries();        
+        if(txListJson && txListJson.transaction_summaries.length > 0) {
             // console.log(txListJson.transaction_summaries)
             return txListJson.transaction_summaries[txListJson.transaction_summaries.length - 1].txid;
         }
@@ -526,8 +608,35 @@ class ZingoLib {
         }
     }
 
+    async createNewAddress() {
+        try {
+            const addrStr = await native.zingolib_execute_async('new', 'zto');
+            if (addrStr) {
+                if (addrStr.toLowerCase().startsWith('error')) {
+                    console.log(`Error creating address ${addrStr}`);
+                    return;
+                }
+            } else {
+                console.log('Internal Error creating address');
+                return;
+            }
+
+            const addrNew = JSON.parse(addrStr);
+            const allAddr = await this.fetchAllAddresses();
+            const addrDetails = allAddr.filter((addr) => addr.address == addrNew[0]);
+
+
+            return addrDetails[0];
+        }
+        catch (error) {
+            console.log(`Critical Error parsing address ${error}`);
+            return;
+        }
+    }
+
     async deinitialize() {
         console.log("Safely shutting down zingolib ... ");
+        await this.stopSyncProcess();
         await native.zingolib_execute_async('quit', '');
         process.exit();
     }

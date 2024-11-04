@@ -16,7 +16,7 @@ use std::thread;
 
 use std::cell::RefCell;
 use std::sync::{Arc, Mutex};
-use zingoconfig::{construct_lightwalletd_uri, ChainType, RegtestNetwork, ZingoConfig};
+use zingolib::config::{construct_lightwalletd_uri, ChainType, RegtestNetwork, ZingoConfig};
 use zingolib::{commands, lightclient::LightClient, wallet::WalletBase};
 
 // We'll use a MUTEX to store a global lightclient instance,
@@ -51,7 +51,7 @@ register_module!(mut m, {
 
 fn lock_client(lightclient: LightClient) {
     let lc = Arc::new(lightclient);
-    LightClient::start_mempool_monitor(lc.clone());
+    let _ = LightClient::start_mempool_monitor(lc.clone());
 
     LIGHTCLIENT.lock().unwrap().replace(Some(lc));
 }
@@ -69,7 +69,7 @@ fn construct_uri_load_config(
         "regtest" => ChainType::Regtest(RegtestNetwork::all_upgrades_active()),
         _ => return Err("Error: Not a valid chain hint!".to_string()),
     };
-    let config = match zingoconfig::load_clientconfig(
+    let config = match zingolib::config::load_clientconfig(
         lightwalletd_uri.clone(),
         None,
         chaintype,
@@ -113,10 +113,13 @@ fn zingolib_wallet_exists(mut cx: FunctionContext) -> JsResult<JsBoolean> {
 fn zingolib_init_new(mut cx: FunctionContext) -> JsResult<JsString> {
     let server_uri = cx.argument::<JsString>(0)?.value(&mut cx);
     let chain_hint = cx.argument::<JsString>(1)?.value(&mut cx);
+    let monitor_mempool = cx.argument::<JsBoolean>(2)?.value(&mut cx);
+   
+    rustls::crypto::ring::default_provider().install_default().expect("Failed to install rustls crypto provider");
 
     let resp = || {
         let (config, lightwalletd_uri);
-        match construct_uri_load_config(server_uri, chain_hint, true) {
+        match construct_uri_load_config(server_uri, chain_hint, monitor_mempool) {
             Ok((c, h)) => (config, lightwalletd_uri) = (c, h),
             Err(s) => return s,
         }
@@ -145,12 +148,15 @@ fn zingolib_init_from_seed(mut cx: FunctionContext) -> JsResult<JsString> {
     let seed = cx.argument::<JsString>(1)?.value(&mut cx);
     let birthday = cx.argument::<JsNumber>(2)?.value(&mut cx);
     let chain_hint = cx.argument::<JsString>(3)?.value(&mut cx);
+    let monitor_mempool = cx.argument::<JsBoolean>(4)?.value(&mut cx);
 
     let birthday_u64: u64 = birthday as u64;
 
+    rustls::crypto::ring::default_provider().install_default().expect("Failed to install rustls crypto provider");
+
     let resp = || {
         let (config, _lightwalletd_uri);
-        match construct_uri_load_config(server_uri, chain_hint, true) {
+        match construct_uri_load_config(server_uri, chain_hint, monitor_mempool) {
             Ok((c, h)) => (config, _lightwalletd_uri) = (c, h),
             Err(s) => return s,
         }
@@ -177,12 +183,15 @@ fn zingolib_init_from_ufvk(mut cx: FunctionContext) -> JsResult<JsString> {
     let ufvk = cx.argument::<JsString>(1)?.value(&mut cx);
     let birthday = cx.argument::<JsNumber>(2)?.value(&mut cx);
     let chain_hint = cx.argument::<JsString>(3)?.value(&mut cx);
+    let monitor_mempool = cx.argument::<JsBoolean>(4)?.value(&mut cx);
 
     let birthday_u64: u64 = birthday as u64;
 
+    rustls::crypto::ring::default_provider().install_default().expect("Failed to install rustls crypto provider");
+
     let resp = || {
         let (config, _lightwalletd_uri);
-        match construct_uri_load_config(server_uri, chain_hint, true) {
+        match construct_uri_load_config(server_uri, chain_hint, monitor_mempool) {
             Ok((c, h)) => (config, _lightwalletd_uri) = (c, h),
             Err(s) => return s,
         }
@@ -208,10 +217,13 @@ fn zingolib_init_from_ufvk(mut cx: FunctionContext) -> JsResult<JsString> {
 fn zingolib_init_from_b64(mut cx: FunctionContext) -> JsResult<JsString> {
     let server_uri = cx.argument::<JsString>(0)?.value(&mut cx);
     let chain_hint = cx.argument::<JsString>(1)?.value(&mut cx);
+    let monitor_mempool = cx.argument::<JsBoolean>(2)?.value(&mut cx);
+    
+    rustls::crypto::ring::default_provider().install_default().expect("Failed to install rustls crypto provider");
 
     let resp = || {
         let (config, _lightwalletd_uri);
-        match construct_uri_load_config(server_uri, chain_hint, true) {
+        match construct_uri_load_config(server_uri, chain_hint, monitor_mempool) {
             Ok((c, h)) => (config, _lightwalletd_uri) = (c, h),
             Err(s) => return s,
         }
@@ -296,8 +308,13 @@ fn zingolib_execute_async(mut cx: FunctionContext) -> JsResult<JsPromise> {
                 commands::do_user_command(&cmd, &args, lightclient.as_ref()).clone()
             }
         };
+        let safe_resp = if resp.is_empty() {
+            "No response".to_string()
+        } else {
+            resp
+        };
 
-        deferred.settle_with(&channel, move |mut cx| Ok(cx.string(resp)));
+        deferred.settle_with(&channel, move |mut cx| Ok(cx.string(safe_resp)));
 
     });
 

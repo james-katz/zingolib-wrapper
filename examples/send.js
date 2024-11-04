@@ -5,13 +5,13 @@ const client = new Litewallet("https://zec.rocks:443/", "main");
 
 client.init().then(async ()=> {
     // Check if wallet has spend
-    const amount = 0.0005;
+    const amount = 9;
     const bal = await client.fetchTotalBalance();
     console.log(bal);
     if(bal > amount) {
         // Construct a basic transaction
         const tx = new TxBuilder()
-            .setRecipient("u1q56zdmseafz50v22vrxjmamsg0r0ju0xqph308nms9qpz60nf7fl928jjnx3r45nn0fntthmvxc9ql7aldqj5zqgw067w3x9t26pdrkezlv77t2pptjcjhc2xzpwzd20spmn2w2vfgyywezed6g9wjp6yk36gjmmkxdwk47g2cxwf4h8")
+            .setRecipient("u1a30la83zvnzm0j08xhlrls6t8zsr6k23lz98ceq705xm8js822nsm4ptjh6x3ly43cu2f4rqp5n93f79p25gf89rxtdpvwz3a55kx7kv")
             .setAmount(amount)
             .setMemo("Hello World, James Katz rules");
 

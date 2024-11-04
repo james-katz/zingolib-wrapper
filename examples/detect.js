@@ -15,7 +15,7 @@ client.init().then(()=> {
     //});
 
     // Detect a list of recent deposits to wallet every 20 seconds (20 * 1000 ms)
-    pd.detectList(2 * 1000);
+    pd.detectList(20 * 1000);
 
     // Get a list of latest deposits
     pd.on("payments", (txs) => {

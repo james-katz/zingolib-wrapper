@@ -130,12 +130,12 @@ class PaymentDetect extends EventEmitter {
         console.log("Listening for new payment ...")
         this.lastTxId = await this.client.fetchLastTxId();
 
-        const timer = setInterval(async ()=> {
+        setInterval(async ()=> {
             const lastTx = await this.client.fetchLastTxId();                        
             if(lastTx !== this.lastTxId) {
                 this.lastTxId = lastTx;                                           
                 try {
-                    const tx = await this.client.getTransactionsSummaries()
+                    const tx = await this.client.getTransactionsSummaries();
                     const txDetail = tx.transaction_summaries.filter((t) => t.txid === lastTx);
                     if(txDetail[0].kind === 'received') {                    
                         console.log("Detected a new payment")
@@ -150,48 +150,38 @@ class PaymentDetect extends EventEmitter {
         console.log("Listening for new payments ...")
         this.lastTxId = await this.client.fetchLastTxId();
 
-        const timer = setInterval(async ()=> {
-            const lastTx = await this.client.fetchLastTxId();              
-            
+        setInterval(async ()=> {
+            const lastTx = await this.client.fetchLastTxId();
+
+            const txSummaries = await this.client.getTransactionsSummaries();
+            const receivedTxns = txSummaries.transaction_summaries.filter((t) => t.kind == 'received').reverse();           
+            // console.log(receivedTxns)
             if(lastTx == -1) {
-                console.log("txid error")
+                // console.log("txid error")
+                return;
             }
-            else if(lastTx != this.lastTxId) {                
+            else if(receivedTxns.length > 0) {    
+                const lastTxid = receivedTxns[0].txid;
+                let txCount = 0;
+
                 const txList = [];
-                try {
-                    const tx = await this.client.getTransactionsSummaries();
-                    const txDetail = tx.transaction_summaries.filter((t) => t.kind == 'received').reverse();
-                    
-                    if(txDetail.length > 0) {
-                        for(var i = 0; i < txDetail.length; i ++) {                                                
-                        //    console.log(txDetail[i].txid)
-                            if(txDetail[i].txid == this.lastTxId) {
-                                break;
-                            }
-                            
-                            txList.push(txDetail[i]);
-                        }         
+
+                if(lastTxid && this.lastTxId != lastTxid) {               
+                    for(const tx of receivedTxns) {
+                        if(tx.txid == appTxid) {                            
+                            break;
+                        }
+
+                        txList.push(tx);
+                        txCount ++;
                     }
-
-                    if(txList.length > 0) {
-                        console.log(`Detected ${txList.length} new payments`);                            
-                        this.emit("payments", txList);
-                    }
-                } catch(err) { console.log(err) }  
-                
-                this.lastTxId = lastTx;              
+                         
+                    this.lastTxId = lastTxid;                    
+                    console.log(`Received a total of ${txCount} new transactions.`)
+                    this.emit("payments", txList);
+                }
             }
-            else {
-                // const tx = await this.client.getTransactionsSummaries();
 
-                // const txDetail = tx.transaction_summaries.filter((t) => t.kind == 'received').reverse().flat();
-
-                // // const txDetail = tx.transaction_summaries.reverse().flat();
-
-                // console.log(this.lastTxId)
-                // console.log(lastTx)
-                // console.log(txDetail[0]);
-            }
         }, interval);
     }
 
