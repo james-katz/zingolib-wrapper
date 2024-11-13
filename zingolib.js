@@ -423,6 +423,7 @@ class ZingoLib {
         const prevProgressJSON = JSON.parse(prevProgressStr);
         const prevSendId = prevProgressJSON.id;
         let sendTxids = '';
+        let sendTxid = '';
         
         this.isSending = true;
 
@@ -434,7 +435,6 @@ class ZingoLib {
         } 
         catch(err) {
             console.log(`Error sending Tx: ${err}`);
-            this.isSending = false;
             throw err;
         }
 
@@ -453,16 +453,19 @@ class ZingoLib {
                     console.log(`Error confirming Tx: ${respJSON.error}`);
                     throw Error(respJSON.error);
                 } 
-                else if (respJSON.txids) {
+                else if (respJSON.txids) {                    
                     sendTxids = respJSON.txids.join(', ');
+                    sendTxid = respJSON.txids[0];
                 } 
                 else {
                     console.log(`Error confirming: no error, no txids `);
+                    this.isSending = false;
                     throw Error('Error confirming: no error, no txids');
                 }
             }
         } catch (err) {
             console.log(`Error confirming Tx: ${err}`);
+            this.isSending = false;
             throw err;
         }
         
@@ -477,7 +480,7 @@ class ZingoLib {
                     return;
                 }
 
-                if (!progressJSON.txid && !progressJSON.error  && !sendTxids) {
+                if (!progressJSON.txid && !progressJSON.error && !sendTxids) {
                     // Still processing
                     return;
                 }
@@ -490,7 +493,8 @@ class ZingoLib {
                     // And refresh data (full refresh)
                     this.doRefresh(true);
             
-                    resolve(progressJSON.txid);
+                    resolve(sendTxid);
+                    // resolve(progressJSON.txid);
                 }
         
                 if (progressJSON.error) {
@@ -501,7 +505,8 @@ class ZingoLib {
                     // And refresh data (full refresh)
                     this.doRefresh(true);
           
-                    resolve(sendTxids);
+                    resolve(sendTxid);
+                    // resolve(respJSON.txids[0]);
                   }
 
             }, 2 * 1000); // Every two seconds
