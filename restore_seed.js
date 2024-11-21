@@ -1,8 +1,8 @@
 const ZingoLib = require('./zingolib');
 
-const client = new ZingoLib("https://zec.rocks:443", "main");
+const client = new ZingoLib("https://zec.rocks:443", "main", false);
 
-client.restore("powder layer oblige amused shed just cushion tent crystal blast catch bundle gym tortoise razor surprise quality awesome planet kangaroo shrimp age pluck crew", 2526004).then(res => {
+client.restore("abandon amount liar amount expire adjust cage candy arch gather drum bullet absurd math era live bid rhythm alien crouch range attend journey unaware", 2719000).then(res => {
     console.log(res);
 })
 .catch((err) => { console.log(err) });

@@ -1,17 +1,17 @@
 const Litewallet = require('../zingolib');
 const { TxBuilder } = require('../utils/utils');
 
-const client = new Litewallet("https://zec.rocks:443/", "main");
+const client = new Litewallet("https://zec.rocks:443/", "main", false);
 
 client.init().then(async ()=> {
     // Check if wallet has spend
-    const amount = 9;
+    const amount = 0.18;
     const bal = await client.fetchTotalBalance();
     console.log(bal);
     if(bal > amount) {
         // Construct a basic transaction
         const tx = new TxBuilder()
-            .setRecipient("u1a30la83zvnzm0j08xhlrls6t8zsr6k23lz98ceq705xm8js822nsm4ptjh6x3ly43cu2f4rqp5n93f79p25gf89rxtdpvwz3a55kx7kv")
+            .setRecipient("u1v0tyc0pcv4uzmttsg3k6tr43pclz83sx6guf65nrjc0ynek8yyylpesv9t4a44dflkg7qmvrkmsgld0vxc7v9q3zye7cxu9epa2grmqdas84eynj5eczm6y7jazcgdmsh0tus0ck6w0juku2j9gltt7cv3wnqahm55t4v472435zcp3t04nzdzrtys32tm2l6x65e5qgz4jwglsdz7m")
             .setAmount(amount)
             .setMemo("Hello World, James Katz rules");
 
