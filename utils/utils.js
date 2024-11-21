@@ -10,7 +10,8 @@ class TxBuilder {
     }
 
     setAmount(amount) {
-        this.amount = parseInt(amount * 10**8);
+        let amountFixed = amount.toFixed(8);
+        this.amount = parseInt(amountFixed * 10**8);
         return this;
     }
 
