@@ -15,8 +15,8 @@ client.init().then(async (res)=> {
     console.log("Default fee: ", fee);
 
     // Get all addresses
-     const addrs = await client.fetchAllAddresses();;
-     console.log(addrs);
+    //  const addrs = await client.fetchAllAddresses();;
+    //  console.log(addrs);
 
     // Get addresses with balance
     // const addrsB = await client.getAddressesWithBalance();;
@@ -35,9 +35,9 @@ client.init().then(async (res)=> {
     // console.log(txid);
 
     // Get last transaction details (uncomment previous txid line)
-      const tx = client.getTransactionsSummaries();    
-      const lastTx = tx.transaction_summaries.filter((t) => t.txid === txid);
-      console.log(lastTx[0]);
+      // const tx = client.getTransactionsSummaries();    
+      // const lastTx = tx.transaction_summaries.filter((t) => t.txid === txid);
+      // console.log(lastTx[0]);
 
     //  const txAddrVal = await client.getAddressAndValueFromTx({txid: txid})
     //  console.log(txAddrVal)
@@ -53,12 +53,12 @@ client.init().then(async (res)=> {
     // }
     
     // Get the wallet seed
-     const seed = await client.getWalletSeed();
-     console.log(seed);
+    //  const seed = await client.getWalletSeed();
+    //  console.log(seed);
 
     // Get the wallet ufvk
-     const ufvk = await client.getWalletUfvk();    
-     console.log(ufvk);
+    //  const ufvk = await client.getWalletUfvk();    
+    //  console.log(ufvk);
 
     // client.deinitialize();
 }).catch((err) => {console.log(err)});

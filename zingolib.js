@@ -16,6 +16,9 @@ class ZingoLib {
 
     async init() {
         return new Promise(async (resolve, reject) => {            
+            if(!native.zingolib_set_crypto_default_provider_to_ring()) {
+                reject("Error initializing crypto provider.")
+            };
             if (native.zingolib_wallet_exists(this.serveruri, 'main')) {
                 const wallet = native.zingolib_init_from_b64(this.serveruri, 'main', this.monitorMempool);
                 if (wallet && !wallet.toLowerCase().startsWith('error')) {
@@ -480,7 +483,7 @@ class ZingoLib {
                     return;
                 }
 
-                if (!progressJSON.txid && !progressJSON.error && !sendTxids) {
+                if (!progressJSON.txids && !progressJSON.error && !sendTxids) {
                     // Still processing
                     return;
                 }
@@ -488,13 +491,11 @@ class ZingoLib {
                 // Finished processing
                 clearInterval(intervalID);
                 this.isSending = false;
-
-                if (progressJSON.txid) {
+                if (progressJSON.txids) {
                     // And refresh data (full refresh)
                     this.doRefresh(true);
             
-                    resolve(sendTxid);
-                    // resolve(progressJSON.txid);
+                    resolve(progressJSON.txids[0]);
                 }
         
                 if (progressJSON.error) {
@@ -506,7 +507,6 @@ class ZingoLib {
                     this.doRefresh(true);
           
                     resolve(sendTxid);
-                    // resolve(respJSON.txids[0]);
                   }
 
             }, 2 * 1000); // Every two seconds
