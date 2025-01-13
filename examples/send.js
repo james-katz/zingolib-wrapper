@@ -5,7 +5,7 @@ const client = new Litewallet("https://zcashd.zec.rocks:443/", "main", false);
 
 client.init().then(async ()=> {
     // Check if wallet has spend
-    const amount = 0.0005;
+    const amount = 0.2;
     const bal = await client.fetchTotalBalance();
     console.log(bal);
     if(bal > amount) {
