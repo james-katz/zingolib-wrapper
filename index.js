@@ -32,15 +32,15 @@ client.init().then(async (res)=> {
     
     // Get last txid
      const txid = client.fetchLastTxId();
-    // console.log(txid);
+     console.log(txid);
 
     // Get last transaction details (uncomment previous txid line)
-      // const tx = client.getTransactionsSummaries();    
-      // const lastTx = tx.transaction_summaries.filter((t) => t.txid === txid);
-      // console.log(lastTx[0]);
+      //  const tx = client.getTransactionsSummaries();    
+      //  const lastTx = tx.transaction_summaries.filter((t) => t.txid === txid);
+      //  console.log(lastTx[0]);
 
-    //  const txAddrVal = await client.getAddressAndValueFromTx({txid: txid})
-    //  console.log(txAddrVal)
+     const txAddrVal = await client.getAddressAndValueFromTx({txid: txid})
+     console.log(txAddrVal)
      
 
     //Get all transactions
@@ -53,8 +53,8 @@ client.init().then(async (res)=> {
     // }
     
     // Get the wallet seed
-    //  const seed = await client.getWalletSeed();
-    //  console.log(seed);
+      // const seed = await client.getWalletSeed();
+      // console.log(seed);
 
     // Get the wallet ufvk
     //  const ufvk = await client.getWalletUfvk();    

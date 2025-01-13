@@ -4369,6 +4369,8 @@ dependencies = [
  "neon",
  "rustls",
  "tokio",
+ "zcash_client_backend",
+ "zcash_primitives",
  "zingolib",
 ]
 

@@ -48,6 +48,9 @@ class ZingoLib {
 
     async restore(seed, birthday) {
         return new Promise((resolve, reject) => {
+            if(!native.zingolib_set_crypto_default_provider_to_ring()) {
+                reject("Error initializing crypto provider.")
+            };
             if(seed) {            
                 console.log("Trying to initialize wallet from seed ...")
                 const res = native.zingolib_init_from_seed(this.serveruri, seed, birthday, this.chain, this.monitorMempool);
@@ -66,6 +69,9 @@ class ZingoLib {
 
     async from_ufvk(ufvk, birthday) {
         return new Promise((resolve, reject) => {
+            if(!native.zingolib_set_crypto_default_provider_to_ring()) {
+                reject("Error initializing crypto provider.")
+            };
             if(ufvk) {            
                 console.log("Trying to initialize wallet from ufvk (watch only) ...")
                 const res = native.zingolib_init_from_ufvk(this.serveruri, ufvk, birthday, this.chain, this.monitorMempool);
@@ -263,7 +269,7 @@ class ZingoLib {
     async fetchTotalBalance() {
         try {
             const balStr = await native.zingolib_execute_async('balance', '');
-            console.log(balStr);
+            // console.log(balStr);
             if (balStr) {
                 if (balStr.toLowerCase().startsWith('error')) {
                     console.log(`Error wallet balance ${balStr}`);
@@ -414,7 +420,7 @@ class ZingoLib {
         const addrAndValue = notes.map((el) => {
             return {
                 address: el.address,
-                value: el.value,
+                value: el.value
             }
         });
         return addrAndValue;
@@ -609,6 +615,17 @@ class ZingoLib {
         }
         catch (error) {
             console.log(`Critical Error parsing address ${error}`);
+            return;
+        }
+    }
+
+    decodeAddress(addr) {
+        try {
+            let res = native.zingolib_decode_ua(addr);
+            return res;
+        }
+        catch(err) {
+            // console.log(err);
             return;
         }
     }

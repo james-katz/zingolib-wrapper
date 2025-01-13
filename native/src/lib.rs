@@ -7,6 +7,10 @@ use tokio::runtime::Runtime;
 
 use rustls::crypto::ring::default_provider;
 use rustls::crypto::CryptoProvider;
+use zcash_client_backend::address::UnifiedAddress;
+use zcash_client_backend::encoding::{AddressCodec, encode_payment_address};
+use zcash_primitives::consensus::MainNetwork;
+use zcash_primitives::constants::mainnet::HRP_SAPLING_PAYMENT_ADDRESS;
 
 use std::thread;
 
@@ -43,6 +47,7 @@ fn main(mut cx: ModuleContext) -> NeonResult<()> {
     cx.export_function("zingolib_get_transaction_summaries", zingolib_get_transaction_summaries)?;
     cx.export_function("zingolib_get_value_transfers", zingolib_get_value_transfers)?;
     cx.export_function("zingolib_set_crypto_default_provider_to_ring", zingolib_set_crypto_default_provider_to_ring)?;
+    cx.export_function("zingolib_decode_ua", decode_ua)?;
 
     Ok(())
 }
@@ -369,3 +374,31 @@ pub fn zingolib_set_crypto_default_provider_to_ring(mut cx: FunctionContext) -> 
 
     Ok(cx.string(resp))
 }
+
+fn decode_ua(mut cx: FunctionContext) -> JsResult<JsObject> {
+    // Retrieve the Unified Address from the first argument
+    let ua = cx.argument::<JsString>(0)?.value(&mut cx);
+
+    // Attempt to decode the Unified Address
+    let ua_full = match UnifiedAddress::decode(&MainNetwork, &ua) {
+        Ok(u) => u,
+        Err(err) => return cx.throw_error(format!("Failed to decode Unified Address: {}", err)),
+    };
+
+    // Extract Sapling address, if it exists
+    let sapling_str: Option<String> = ua_full
+        .sapling()
+        .map(|addr| encode_payment_address(HRP_SAPLING_PAYMENT_ADDRESS, &addr));
+
+    // Create Neon strings for the output
+    let ua_neon = cx.string(&ua);
+    let sapling_neon = cx.string(sapling_str.unwrap_or_else(|| "null".to_string()));
+
+    // Construct the result object
+    let obj = cx.empty_object();
+    obj.set(&mut cx, "ua", ua_neon)?;
+    obj.set(&mut cx, "sapling", sapling_neon)?;
+
+    Ok(obj)
+}
+

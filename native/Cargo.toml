@@ -18,6 +18,9 @@ lazy_static = "1.4.0"
 tokio = { version = "1.24", features = ["full"] }
 rustls = { version = "0.23.13", features = ["ring"] }
 
+zcash_client_backend = { git = "https://github.com/zingolabs/librustzcash.git", tag = "zcash_client_sqlite-0.12.1_plus_zingolabs_changes-test_2" , features = ["lightwalletd-tonic", "orchard", "transparent-inputs"] }
+zcash_primitives = { git = "https://github.com/zingolabs/librustzcash.git", tag = "zcash_client_sqlite-0.12.1_plus_zingolabs_changes-test_2"  }
+
 [dependencies.neon]
 version = "1"
 default-features = true
