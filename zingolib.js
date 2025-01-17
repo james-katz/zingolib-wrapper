@@ -19,8 +19,8 @@ class ZingoLib {
             if(!native.zingolib_set_crypto_default_provider_to_ring()) {
                 reject("Error initializing crypto provider.")
             };
-            if (native.zingolib_wallet_exists(this.serveruri, 'main')) {
-                const wallet = native.zingolib_init_from_b64(this.serveruri, 'main', this.monitorMempool);
+            if (native.zingolib_wallet_exists(this.serveruri, this.chain)) {
+                const wallet = native.zingolib_init_from_b64(this.serveruri, this.chain, this.monitorMempool);
                 if (wallet && !wallet.toLowerCase().startsWith('error')) {
                     console.log("Initializing existing wallet.");
                 }
@@ -31,7 +31,7 @@ class ZingoLib {
             }
             else {
                 console.log("No wallet configured, creating a new one.");
-                const res = native.zingolib_init_new(this.serveruri, 'main', this.monitorMempool);
+                const res = native.zingolib_init_new(this.serveruri, this.chain, this.monitorMempool);
                 if (res && !res.toLowerCase().startsWith('error')) {
                     const seed = await this.getWalletSeed();
                     console.log('Created new wallet, please save the seed:', seed);
