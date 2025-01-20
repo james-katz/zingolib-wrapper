@@ -1,7 +1,7 @@
 const ZingoLib = require('./zingolib');
 // const { TxBuilder, PaymentDetect } = require('./utils/utils');
 
-const client = new ZingoLib("https://zec.rocks:443", "main", true);
+const client = new ZingoLib("https://zec.rocks:443", "test", true);
 
 client.init().then(async (res)=> {
     console.log(res);
@@ -15,20 +15,20 @@ client.init().then(async (res)=> {
     console.log("Default fee: ", fee);
 
     // Get all addresses
-    //  const addrs = await client.fetchAllAddresses();;
-    //  console.log(addrs);
+     const addrs = await client.fetchAllAddresses();;
+     console.log(addrs);
 
     // Get addresses with balance
-    // const addrsB = await client.getAddressesWithBalance();;
-    // console.log(addrsB);
+    const addrsB = await client.getAddressesWithBalance();;
+    console.log(addrsB);
 
     // Create new address
     // const newAddr = await client.createNewAddress();
     // console.log(newAddr)
 
     // Get notes
-    // const notes = await client.fetchNotes();
-    // console.log(notes);
+    const notes = await client.fetchNotes();
+    console.log(notes);
     
     // Get last txid
      const txid = client.fetchLastTxId();
@@ -60,5 +60,5 @@ client.init().then(async (res)=> {
     //  const ufvk = await client.getWalletUfvk();    
     //  console.log(ufvk);
 
-    // client.deinitialize();
+    client.deinitialize();
 }).catch((err) => {console.log(err)});

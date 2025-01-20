@@ -426,6 +426,10 @@ class ZingoLib {
         return addrAndValue;
     }
 
+    async shieldTransparent() {
+        await native.zingolib_execute_async('quickshield','');
+    }
+
     async sendTransaction(sendJson) {
          // First, get the previous send progress id, so we know which ID to track
         const prevProgressStr = await native.zingolib_execute_async("sendprogress", "");
