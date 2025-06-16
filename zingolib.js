@@ -234,6 +234,12 @@ class ZingoLib {
         }
     }
 
+    async doRescan() {
+        console.log("Triggering a wallet rescan ...");
+        const res = await native.zingolib_execute_async('rescan', '');        
+        if(res) console.log(res);
+    }
+
     async fetchInfoAndServerHeight() {
         const res = await native.zingolib_execute_async('info', '');
         if (res && !res.toLowerCase().startsWith('error')) {
@@ -281,15 +287,7 @@ class ZingoLib {
             }
             const balJson = JSON.parse(balStr);     
             
-            // const cleanedString = balStr
-            //     .replace(/[\[\]]/g, '')                
-            //     .replace(/(\s*\w+:\s*[\d_]+)/g, '$1,')
-            //     .replace(/(\w+):/g, '"$1":')
-            //     .replace(/_/g, '')
-            //     .replace(/,\s*$/, '') // Remove trailing comma
-            //     .trim(); // Trim any remaining whitespace or line breaks
-            // const balJson = JSON.parse(`{${cleanedString}}`);
-            // // console.log(balJson)  
+            // console.log(balJson)  
 
             const totalBal = (balJson.sapling_balance + balJson.orchard_balance + balJson.transparent_balance) / 10**8;
             return totalBal;
@@ -427,7 +425,9 @@ class ZingoLib {
     }
 
     async shieldTransparent() {
+        console.log('shielding')
         await native.zingolib_execute_async('quickshield','');
+        console.log('done shielding')
     }
 
     async sendTransaction(sendJson) {
@@ -524,9 +524,9 @@ class ZingoLib {
         });
     }
 
-    getTransactions() {
+    getTransactions(numTx) {
         try {
-            const txnsStr = native.zingolib_get_value_transfers();
+            const txnsStr = native.zingolib_get_value_transfers(numTx);
             if (txnsStr) {
                 if (txnsStr.toLowerCase().startsWith('error')) {
                     console.log(`Error wallet transactions ${txnsStr}`);
@@ -567,10 +567,13 @@ class ZingoLib {
     }
 
     fetchLastTxId() {        
-        const txListJson =  this.getTransactionsSummaries();        
-        if(txListJson && txListJson.transaction_summaries.length > 0) {
+        const txList =  native.zingolib_get_value_transfers(1);        
+        
+        const txListJson = JSON.parse(txList);
+
+        if(txListJson && txListJson.value_transfers.length > 0) {
             // console.log(txListJson.transaction_summaries)
-            return txListJson.transaction_summaries[txListJson.transaction_summaries.length - 1].txid;
+            return txListJson.value_transfers[0].txid;
         }
         else return -1;
     }

@@ -1,11 +1,11 @@
 const Litewallet = require('../zingolib');
 const { TxBuilder } = require('../utils/utils');
 
-const client = new Litewallet("https://zcashd.zec.rocks:443/", "test", false);
+const client = new Litewallet("https://zaino.testnet.unsafe.zec.rocks:443", "test", false);
 
 client.init().then(async ()=> {
     // Check if wallet has spend
-    const amount = 0.321;
+    const amount = 25;
     const bal = await client.fetchTotalBalance();
     console.log(bal);
     if(bal > amount) {
@@ -13,7 +13,7 @@ client.init().then(async ()=> {
         const tx = new TxBuilder()
             .setRecipient("utest1hc7nfnu8h00wrnnxx3g0ff8fgl3a9eaelv6uw8f8l8pz7epr2xglahhwtycv3w36qgj4x4snkfv4xcpye2wz26e5xkjum9ylynwhh4p7ldp40zs8jwhze68pdlfnecxq6ghfenwzpluy4fwh0ef3y9k67efcmpc6j3xfc9w3rtaxue9hw7n33hnpsdmlxzw63gxx2gd6hqkuyd05w2q")
             .setAmount(amount)
-            .setMemo("Hello testnet World");
+            .setMemo("Testing from zingolib 1.11.1");
 
         // Get the sendjson
         const sendJson = tx.getSendJSON();

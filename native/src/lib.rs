@@ -334,6 +334,7 @@ fn zingolib_get_transaction_summaries(mut cx: FunctionContext) -> JsResult<JsStr
 }
 
 fn zingolib_get_value_transfers(mut cx: FunctionContext) -> JsResult<JsString> {
+    let vts = cx.argument::<JsNumber>(0)?.value(&mut cx);
     let resp: String;
     {
         let lightclient: Arc<LightClient>;
@@ -349,7 +350,7 @@ fn zingolib_get_value_transfers(mut cx: FunctionContext) -> JsResult<JsString> {
 
         let rt = Runtime::new().unwrap();
         resp = rt.block_on(async {
-            lightclient.value_transfers_json_string().await
+            lightclient.value_transfers_json_string(vts as usize).await
         })
     };
 

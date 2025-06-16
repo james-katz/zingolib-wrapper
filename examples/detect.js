@@ -1,7 +1,7 @@
 const Litewallet = require('../zingolib');
 const { PaymentDetect } = require('../utils/utils');
 
-const client = new Litewallet("https://zec.rocks:443", 'main');
+const client = new Litewallet("https://zaino.testnet.unsafe.zec.rocks:443", 'test', true);
 
 client.init().then(()=> {
     const pd = new PaymentDetect(client);

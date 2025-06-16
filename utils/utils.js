@@ -136,8 +136,8 @@ class PaymentDetect extends EventEmitter {
             if(lastTx !== this.lastTxId) {
                 this.lastTxId = lastTx;                                           
                 try {
-                    const tx = await this.client.getTransactionsSummaries();
-                    const txDetail = tx.transaction_summaries.filter((t) => t.txid === lastTx);
+                    const tx = await this.client.getTransactions(10);
+                    const txDetail = tx.value_transfers.filter((t) => t.txid === lastTx);
                     if(txDetail[0].kind === 'received') {                    
                         console.log("Detected a new payment")
                         this.emit('payment', txDetail[0]);
@@ -154,8 +154,8 @@ class PaymentDetect extends EventEmitter {
         setInterval(async ()=> {
             const lastTx = await this.client.fetchLastTxId();
 
-            const txSummaries = await this.client.getTransactionsSummaries();
-            const receivedTxns = txSummaries.transaction_summaries.filter((t) => t.kind == 'received').reverse();           
+            const txSummaries = await this.client.getTransactions(10);
+            const receivedTxns = txSummaries.value_transfers.filter((t) => t.kind == 'received');           
             // console.log(receivedTxns)
             if(lastTx == -1) {
                 // console.log("txid error")
@@ -169,7 +169,7 @@ class PaymentDetect extends EventEmitter {
 
                 if(lastTxid && this.lastTxId != lastTxid) {               
                     for(const tx of receivedTxns) {
-                        if(tx.txid == appTxid) {                            
+                        if(tx.txid == this.lastTxId) {                            
                             break;
                         }
 

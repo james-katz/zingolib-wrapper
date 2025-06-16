@@ -1,7 +1,7 @@
 const ZingoLib = require('./zingolib');
 // const { TxBuilder, PaymentDetect } = require('./utils/utils');
 
-const client = new ZingoLib("https://zec.rocks:443", "test", true);
+const client = new ZingoLib("https://zaino.testnet.unsafe.zec.rocks:443", "test", true);
 
 client.init().then(async (res)=> {
     console.log(res);
@@ -13,13 +13,14 @@ client.init().then(async (res)=> {
     // Get default fee
     const fee = await client.getDefaultFee();
     console.log("Default fee: ", fee);
+    // await client.fetchSpendableBalance();
 
     // Get all addresses
-     const addrs = await client.fetchAllAddresses();;
-     console.log(addrs);
+    //  const addrs = await client.fetchAllAddresses();
+    //  console.log(addrs);
 
     // Get addresses with balance
-    const addrsB = await client.getAddressesWithBalance();;
+    const addrsB = await client.getAddressesWithBalance();
     console.log(addrsB);
 
     // Create new address
@@ -27,38 +28,43 @@ client.init().then(async (res)=> {
     // console.log(newAddr)
 
     // Get notes
-    const notes = await client.fetchNotes();
-    console.log(notes);
+    //const notes = await client.fetchNotes();
+    //console.log(notes);
     
     // Get last txid
      const txid = client.fetchLastTxId();
      console.log(txid);
 
     // Get last transaction details (uncomment previous txid line)
-      //  const tx = client.getTransactionsSummaries();    
-      //  const lastTx = tx.transaction_summaries.filter((t) => t.txid === txid);
-      //  console.log(lastTx[0]);
+    // const tx = client.getTransactionsSummaries();    
+    // const lastTx = tx.transaction_summaries.filter((t) => t.txid === txid);
+    // console.log(lastTx[0]);
 
-     const txAddrVal = await client.getAddressAndValueFromTx({txid: txid})
-     console.log(txAddrVal)
+    //  const txAddrVal = await client.getAddressAndValueFromTx({txid: txid})
+    //  console.log(txAddrVal)
      
+    //Get arbitrary number of transactions
+    const txns = client.getTransactions(10);
+    // console.log(txns);
 
-    //Get all transactions
-    // const txns = client.getTransactions();
-	
-    // const r = txns.value_transfers.filter((t) => t.kind == 'received');
-    // for(const rx of r ) {
-    //     const rAddr = await client.getAddressAndValueFromTx(rx);    
-    //     if(rAddr && rAddr.length > 0) console.log(rAddr);
-    // }
+    // And filter recevied tx only
+    const r = txns.value_transfers.filter((t) => t.kind == 'received');
+    for(const rx of r ) {
+        console.log(r);
+        // const rAddr = await client.getAddressAndValueFromTx(rx);    
+        // if(rAddr && rAddr.length > 0) console.log(rAddr);
+    }
     
     // Get the wallet seed
-      // const seed = await client.getWalletSeed();
-      // console.log(seed);
+       const seed = await client.getWalletSeed();
+       console.log(seed);
 
     // Get the wallet ufvk
     //  const ufvk = await client.getWalletUfvk();    
     //  console.log(ufvk);
 
+    // await client.shieldTransparent();
+
     client.deinitialize();
+  
 }).catch((err) => {console.log(err)});
