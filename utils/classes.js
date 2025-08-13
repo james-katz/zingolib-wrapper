@@ -71,8 +71,6 @@ class Info {
     }
 }
 
-
-
 module.exports = {
     TxDetail,
     Transaction,

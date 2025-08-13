@@ -1,17 +1,14 @@
 {
-  "name": "zingolib-wrapper",
-  "version": "1.0.0",
-  "description": "Zingolib wrapper library",
-  "main": "index.js",
-  
-  "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "build": "npm run neon",
-    "neon": "cargo-cp-artifact -a cdylib zingolib-native native.node -- cargo build --release --manifest-path native/Cargo.toml --message-format=json-render-diagnostics"
-  },
+  "name": "zingolib-native",
+  "version": "0.1.0",
+  "description": "Node.js wrapper for zingolib",
   "author": "James Katz",
   "license": "MIT",
+  "scripts": {
+    "neon": "cargo-cp-artifact -nc native.node -- cargo build --release --manifest-path native/Cargo.toml --message-format=json-render-diagnostics",
+    "build": "npm run neon"
+  },
   "devDependencies": {
-    "cargo-cp-artifact": "^0.1"
+    "cargo-cp-artifact": "^0.1.9"
   }
 }

@@ -12,15 +12,24 @@ crate-type = ["cdylib"]
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-zingolib = { git="https://github.com/zingolabs/zingolib", default-features=true, tag = "1.11.1", features=["test-elevation"] }
-http = "1.1.0"
+zingolib = { git = "https://github.com/zingolabs/zingolib", default-features = true, tag = "2.0.2" }
+pepper-sync = { git = "https://github.com/zingolabs/zingolib", tag = "2.0.2" }
+zingo-infra-services = { git = "https://github.com/zingolabs/infrastructure.git", branch = "dev" }
+bip0039 = { version = "0.12", features = [ "rand" ] }
+http = "1.1.0" 
 lazy_static = "1.4.0"
 tokio = { version = "1.24", features = ["full"] }
 rustls = { version = "0.23.13", features = ["ring"] }
-
-zcash_client_backend = { git = "https://github.com/zingolabs/librustzcash.git", tag = "zcash_client_sqlite-0.12.1_plus_zingolabs_changes-test_2" , features = ["lightwalletd-tonic", "orchard", "transparent-inputs"] }
-zcash_primitives = { git = "https://github.com/zingolabs/librustzcash.git", tag = "zcash_client_sqlite-0.12.1_plus_zingolabs_changes-test_2"  }
+zcash_primitives = "0.22.0"
+zcash_client_backend = { version = "=0.18.0" , features = ["lightwalletd-tonic", "orchard", "transparent-inputs", "tor"] }
+zcash_keys = { version = "0.8.0" , features = ["transparent-inputs", "sapling", "orchard" ] }
+zcash_address = "0.7.0"
+zcash_protocol = "=0.5.1"
+tracing = "0.1.41"
+serde_json = "1"
+json = "0.12.4"
+futures = "0.3.31"
 
 [dependencies.neon]
-version = "1"
+version = "=1.0.0"
 default-features = true

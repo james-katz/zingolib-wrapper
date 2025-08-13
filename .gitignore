@@ -22,4 +22,10 @@ pnpm-debug.log*
 
 # node module
 native.node
+index.node
 native/target
+
+
+# Added by cargo
+
+/target

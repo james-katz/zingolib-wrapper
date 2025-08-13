@@ -1,10 +1,9 @@
 const native = require('./native.node');
 
 class ZingoLib {
-    constructor(uri, chain, monitorMempool) {
+    constructor(uri, chain) {
         this.serveruri = uri;
         this.chain = chain;
-        this.monitorMempool = monitorMempool;
 
         this.syncInterval;
         this.syncStatusInterval;
@@ -20,40 +19,42 @@ class ZingoLib {
                 reject("Error initializing crypto provider.")
             };
             if (native.zingolib_wallet_exists(this.serveruri, this.chain)) {
-                const wallet = native.zingolib_init_from_b64(this.serveruri, this.chain, this.monitorMempool);
-                if (wallet && !wallet.toLowerCase().startsWith('error')) {
-                    console.log("Initializing existing wallet.");
+                try {
+                    const wallet = native.zingolib_init_from_disk(this.serveruri, this.chain);
+                    if (wallet && !wallet.toLowerCase().startsWith('error')) {
+                        console.log(wallet);
+                    }
                 }
-                else {
-                    console.log("Error initializing wallet");
+                catch(err) {
+                    console.log(`Error initializing wallet: ${err}`);
                     reject(wallet);
                 }
             }
             else {
-                console.log("No wallet configured, creating a new one.");
-                const res = native.zingolib_init_new(this.serveruri, this.chain, this.monitorMempool);
-                if (res && !res.toLowerCase().startsWith('error')) {
+                console.log("No wallet configured, creating a new one from fresh entropy..");
+                try {
+                    const res = native.zingolib_init_new(this.serveruri, this.chain);
                     const seed = await this.getWalletSeed();
-                    console.log('Created new wallet, please save the seed:', seed);
+                    console.log(`${res}\nPlease save this recovery info:`, seed);
                 }
-                else {
+                catch(err) {
                     console.log("Error trying to create a new wallet", seed);
-                    reject(seed);
-                }
+                    reject(err);
+                }                                
             }
-            await this.configure();
+            this.configure();
             resolve("Ok");
-        });
+        });             
     }
 
-    async restore(seed, birthday) {
+    restore(seed, birthday) {
         return new Promise((resolve, reject) => {
             if(!native.zingolib_set_crypto_default_provider_to_ring()) {
                 reject("Error initializing crypto provider.")
             };
             if(seed) {            
                 console.log("Trying to initialize wallet from seed ...")
-                const res = native.zingolib_init_from_seed(this.serveruri, seed, birthday, this.chain, this.monitorMempool);
+                const res = native.zingolib_init_from_seed_phrase(this.serveruri, seed, birthday, this.chain);
                 if(!res.toLowerCase().startsWith('error')) {
                     // const seedJson = JSON.parse(res);
                     console.log(`Seed imported, will sync from height ${birthday}`);
@@ -67,14 +68,14 @@ class ZingoLib {
         });        
     }
 
-    async from_ufvk(ufvk, birthday) {
+    from_ufvk(ufvk, birthday) {
         return new Promise((resolve, reject) => {
             if(!native.zingolib_set_crypto_default_provider_to_ring()) {
                 reject("Error initializing crypto provider.")
             };
             if(ufvk) {            
                 console.log("Trying to initialize wallet from ufvk (watch only) ...")
-                const res = native.zingolib_init_from_ufvk(this.serveruri, ufvk, birthday, this.chain, this.monitorMempool);
+                const res = native.zingolib_init_from_ufvk(this.serveruri, ufvk, birthday, this.chain);
                 if(!res.toLowerCase().startsWith('error')) {
                     const ufvkRes = res;
                     console.log(`ufvk imported, will sync from height ${birthday}`);
@@ -88,22 +89,19 @@ class ZingoLib {
         });        
     }
 
-    async sleep(ms) {
-        return new Promise((resolve, reject) => {
-            setTimeout(() => resolve(), ms);
-        });
-    }
+    // async sleep(ms) {
+    //     return new Promise((resolve, reject) => {
+    //         setTimeout(() => resolve(), ms);
+    //     });
+    // }
 
-    async configure() {
+    configure() {
         try {
-            await this.stopSyncProcess();
-            await this.fetchInfoAndServerHeight();
+            this.fetchServerHeight();
+            this.fetchWalletHeight();
 
-            // Save wallet
-            // const res = native.saveWallet();
-            // if (!res || res.toLowerCase().startsWith('error')) {
-            //     console.log("Error saving wallet");
-            // }
+            // const task = native.zingolib_save_wallet_task();
+            // console.log(task);
 
             // Do initial sync
             this.doRefresh(false);
@@ -112,6 +110,11 @@ class ZingoLib {
             this.syncInterval = setInterval(() => {
                 this.doRefresh(false);
             }, 75 * 1000);
+
+            process.on('SIGINT', () => {
+                this.deinitialize();
+                process.exit();
+            });
         }
         catch (e) {
             console.log("Couldn't configure the wallet", e);
@@ -119,27 +122,38 @@ class ZingoLib {
         }
     }
 
-    async stopSyncProcess() {
-        let res = await this.doSyncStatus();
-        let ss = JSON.parse(res);
-
-        while (ss.in_progress) {
-            await this.sleep(300);
-
-            this.setInterruptSyncAfterBatch(true);
-            console.log('stop sync process. in progress', ss.in_progress);
-
-            res = await this.doSyncStatus();
-            ss = JSON.parse(res);
+    pauseSyncProcess() {
+        try {
+            const res = native.zingolib_pause_sync();
+            console.log(res);
         }
-
-        console.log('stop sync process. STOPPED');
-        await this.setInterruptSyncAfterBatch('false');
+        catch(err) {
+            console.log(err);
+        }
     }
 
-    async doSyncStatus() {
+    stopSyncProcess() {
         try {
-            const syncStatusStr = await native.zingolib_execute_async('syncstatus', '');
+            const res = native.zingolib_stop_sync();
+            console.log(res);
+        }
+        catch(err) {
+            console.log(err);
+        }
+    }
+
+    doSaveWallet() {
+        try {
+            const res = native.zingolib_save_wallet();
+            console.log(res)
+        } catch (error) {
+            console.log(`Critical Error save wallet ${error}`);
+        }
+    }
+    
+    doSyncStatus() {
+        try {
+            const syncStatusStr = native.zingolib_status_sync();
             if (syncStatusStr) {
                 if (syncStatusStr.toLowerCase().startsWith('error')) {
                     console.log(`Error sync status ${syncStatusStr}`);
@@ -157,28 +171,29 @@ class ZingoLib {
         }
     }
 
-    async setInterruptSyncAfterBatch(value) {
+    doSyncPoll() {
         try {
-            const resultStr = await native.zingolib_execute_spawn('interrupt_sync_after_batch', value);
-
-            if (resultStr) {
-                if (resultStr.toLowerCase().startsWith('error')) {
-                    console.log(`Error setting interrupt_sync_after_batch ${resultStr}`);
+            const syncPollStr = native.zingolib_poll_sync();
+            if (syncPollStr) {
+                if (syncPollStr.toLowerCase().startsWith('error')) {
+                    console.log(`Error sync poll ${syncPollStr}`);
+                    throw(syncPollStr);
                 }
             } else {
-                console.log('Internal Error setting interrupt_sync_after_batch');
+                console.log('Internal Error sync poll');
+                throw('Error: Internal RPC Error: sync poll');
             }
+
+            return syncPollStr;
         } catch (error) {
-            console.log(`Critical Error setting interrupt_sync_after_batch ${error}`);
+            console.log(`Critical Error sync poll ${error}`);
+            return `Error: ${error}`;
         }
     }
 
-    async doRefresh(fullRefresh) {
-        if (this.syncStatusInterval) {
-            this.fetchWalletHeight();
-
-            console.log(`Already have a sync process launched. Wallet height is ${this.lastWalletBlockHeight}`);
-            
+    doRefresh(fullRefresh) {
+        if (this.syncStatusInterval) {            
+            console.log(`Already have a sync process launched.`);
             return;
         }
 
@@ -187,151 +202,187 @@ class ZingoLib {
             return;
         }
 
-        this.fetchWalletHeight();
-        this.fetchInfoAndServerHeight();
+        // await this.fetchWalletHeight();
+        this.fetchServerHeight();
 
         if (this.lastWalletBlockHeight < this.lastServerBlockHeight || fullRefresh) {
+        // if (this.lastServerBlockHeight - this.lastWalletBlockHeight >= 3 || fullRefresh) {
             this.inRefresh = true;
 
             console.log(`Refresing wallet: ${this.lastServerBlockHeight - this.lastWalletBlockHeight} new blocks.`);
 
-            native.zingolib_execute_spawn('sync', '');
+            try {
+                let res = native.zingolib_run_sync();
+                if(res) {
+                    console.log(res)
+                    if(res.toLowerCase().startsWith("error")) {
+                        throw(res);                        
+                    }
 
-            this.syncStatusInterval = setInterval(async () => {
-                this.fetchWalletHeight();
-                this.fetchInfoAndServerHeight();
+                    this.syncStatusInterval = setInterval(() => {
+                        const ssStr = this.doSyncStatus();
+                        const ssJson = JSON.parse(ssStr);
 
-                if (this.lastWalletBlockHeight >= this.lastServerBlockHeight) {
-                    clearInterval(this.syncStatusInterval);
-                    this.syncStatusInterval = undefined;
+                        this.fetchWalletHeight();
 
-                    console.log("Wallet is up to date!");
-
-                    this.lastBlockHeight = this.lastServerBlockHeight;
-                    this.inRefresh = false;
-
-                    // await native.saveWallet();
+                        const spStr = this.doSyncPoll();
+                        if(spStr == "Sync task is not complete.") {
+                            console.log(spStr);
+                            console.log(`Wallet height: ${this.lastWalletBlockHeight} | chain_tip: ${this.lastServerBlockHeight}`);                        
+                            console.log(ssJson.percentage_total_blocks_scanned)                            
+                        }
+                        else if(spStr == "Sync task has not been launched." ) {                            
+                            console.log(spStr);
+                            clearInterval(this.syncStatusInterval);
+                            this.syncStatusInterval = undefined;
+                            this.inRefresh = false;  
+                        }
+                        else {
+                            if(ssJson.percentage_total_blocks_scanned >= 100) {
+                                try {
+                                    // const spStr = await this.doSyncPoll();
+                                    // console.log(spStr);
+                                    const spJson = JSON.parse(spStr);
+                                    console.log(`sync_complete { "blocks_scanned": ${spJson.sync_complete?.blocks_scanned} }\n`);
+                                    
+                                    this.fetchWalletHeight();
+                                    this.fetchServerHeight();
+                                    this.doSaveWallet();
+                                                                    
+                                    clearInterval(this.syncStatusInterval);
+                                    this.syncStatusInterval = undefined;
+                                    this.inRefresh = false;                                                                
+                                }
+                                catch(e) { 
+                                    clearInterval(this.syncStatusInterval);
+                                    this.syncStatusInterval = undefined;
+                                    this.inRefresh = false;  
+                                }                            
+                            }
+                        }
+                    }, 4 * 1000);
                 }
                 else {
-                    const ssStr = await this.doSyncStatus();
-                    const ss = JSON.parse(ssStr);
-                    if (!ss.in_progress) {
-                        clearInterval(this.syncStatusInterval);
-                        this.syncStatusInterval = undefined;
-
-                        console.log("Wallet sync was interrupted ...");
-
-                        this.lastBlockHeight = this.lastServerBlockHeight;
-                        this.inRefresh = false;
-
-                        // await native.saveWallet();
-                    }
-                }
-            }, 2 * 1000);
+                    throw("Critical Error run_sync");
+                }                
+            }
+            catch(err) {
+                clearInterval(this.syncStatusInterval);
+                this.syncStatusInterval = undefined;
+                this.inRefresh = false;
+                console.log(err);
+                return;
+            }  
+            
         }
         else {
             console.log(`No new blocks to sync.`);
         }
     }
 
-    async doRescan() {
+    doRescan() {
         console.log("Triggering a wallet rescan ...");
-        const res = await native.zingolib_execute_async('rescan', '');        
-        if(res) console.log(res);
-    }
-
-    async fetchInfoAndServerHeight() {
-        const res = await native.zingolib_execute_async('info', '');
-        if (res && !res.toLowerCase().startsWith('error')) {
-            const infoJson = JSON.parse(res);
-            this.infoObject = infoJson;
-            this.lastServerBlockHeight = infoJson.latest_block_height;
-        }
-    }
-
-    async fetchWalletHeight() {
         try {
-            const heightStr = await native.zingolib_execute_async('height', '');
+            const res = native.zingolib_run_rescan();        
+            if(res) {
+                console.log(res);
+            }
+            else if(res.toLowerCase().startsWith("error")) {
+                throw(res);
+            }
+            else {
+                throw("Internal Error rescan");
+            }
+        }
+        catch(e) {
+            console.log(e);
+        }                
+    }
+
+    fetchServerHeight() {
+        try {
+            const heightStr = native.zingolib_get_latest_block_server(this.serveruri);
             if (heightStr) {
                 if (heightStr.toLowerCase().startsWith('error')) {
-                    console.log(`Error wallet height ${heightStr}`);
+                    console.log(`Error server height ${heightStr}`);
                     return;
                 }
             } else {
-                console.log('Internal Error wallet height');
+                console.log('Internal Error server height');
                 return;
             }
-            const heightJSON = JSON.parse(heightStr);
-            this.lastWalletBlockHeight = heightJSON.height;            
+            
+            this.lastServerBlockHeight = heightStr;
         }
-        catch (error) {
-            console.log(`Critical Error wallet height ${error}`);
-            return;
+        catch(err) {
+            console.log(`Critical Error server height ${err}`);
+            return -1;
+        }   
+        
+        return this.lastServerBlockHeight;
+    }
+
+    fetchWalletHeight() {
+        try {
+            const heightStr = native.zingolib_get_latest_block_wallet();
+            if (heightStr) {                    
+                this.lastWalletBlockHeight = heightStr.height;
+            }
+            else {
+                throw("Internal Error wallet height");
+            }
         }
+        catch(err) {
+            console.log(`Critical Error wallet height ${err}`);
+            return -1;
+        }   
         
         return this.lastWalletBlockHeight;
     }   
 
-    async fetchTotalBalance() {
+    fetchTotalSpendableBalance() {
         try {
-            const balStr = await native.zingolib_execute_async('balance', '');
-            // console.log(balStr);
-            if (balStr) {
-                if (balStr.toLowerCase().startsWith('error')) {
-                    console.log(`Error wallet balance ${balStr}`);
-                    return 0;
-                }
-            } else {
-                console.log('Internal Error wallet balance');
-                return 0;
+            // const bal = native.zingolib_get_spendable_balance_total();
+            const bal = this.fetchWalletBalance();
+            if (bal) {                                    
+                return (bal.confirmed_orchard_balance + bal.confirmed_sapling_balance) / 10 ** 8;
+                // return bal;
             }
-            const balJson = JSON.parse(balStr);     
-            
-            // console.log(balJson)  
-
-            const totalBal = (balJson.sapling_balance + balJson.orchard_balance + balJson.transparent_balance) / 10**8;
-            return totalBal;
+            else {
+                throw("Internal Error wallet balance");
+            }
         }
-        catch (error) {
-            console.log(`Critical Error wallet balance ${error}`);
-            return;
-        }
+        catch(err) {
+            console.log(`Critical Error wallet balance ${err}`);
+            return -1;
+        } 
     }
 
-    async fetchSpendableBalance() {
+    fetchWalletBalance() {
         try {
-            const balStr = await native.zingolib_execute_async('spendablebalance', '');
-            if (balStr) {
-                if (balStr.toLowerCase().startsWith('error')) {
-                    console.log(`Error wallet balance ${balStr}`);
-                    return 0;
-                }
-            } else {
-                console.log('Internal Error wallet balance');
-                return 0;
+            const bal = native.zingolib_get_balance();
+            if (bal) {                    
+                return bal;
             }
-            const balJson = JSON.parse(balStr);     
-            console.log(balJson)       
-            // const totalBal = (balJson.sapling_balance + balJson.orchard_balance + balJson.transparent_balance) / 10**8;
-            // return totalBal;
+            else {
+                throw("Internal Error wallet balance");
+            }
         }
-        catch (error) {
-            console.log(`Critical Error wallet balance ${error}`);
-            return;
-        }
+        catch(err) {
+            console.log(`Critical Error wallet balance ${err}`);
+            return {};
+        } 
     }
 
-    async fetchNotes() {
+    fetchNotes() {
         try {
-            const notesStr = await native.zingolib_execute_async('notes', '');
+            const notesStr = native.zingolib_get_notes(false);
             if (notesStr) {
                 if (notesStr.toLowerCase().startsWith('error')) {
-                    console.log(`Error wallet notes ${notesStr}`);
-                    return;
+                    throw(`Error wallet notes ${notesStr}`);                    
                 }
             } else {
-                console.log('Internal Error wallet notes');
-                return;
+                throw('Internal Error wallet notes');                
             }
             const notesJSON = JSON.parse(notesStr);
             return notesJSON;
@@ -342,9 +393,9 @@ class ZingoLib {
         }
     }
 
-    async fetchAllAddresses() {
+    fetchAllAddresses() {
         try {
-            const addrStr = await native.zingolib_execute_async('addresses', '');
+            const addrStr = native.zingolib_get_unified_addresses();
             
             if (addrStr) {
                 if (addrStr.toLowerCase().startsWith('error')) {
@@ -364,261 +415,264 @@ class ZingoLib {
         }
     }
 
-    async getAddressesWithBalance() {
-        const addrList = await this.fetchAllAddresses();
-        const ab = [];
-        if (addrList) {
-            const notes = await this.fetchNotes();
-            addrList.forEach((addr) => {                
-                // Sum of unspent UTXOs    
-                const utxoValue = notes.utxos
-                    .filter((n) => n.address == addr.address)
-                    .reduce((acc, curr) => acc + curr.value, 0);
+    // async getAddressesWithBalance() {
+    //     const addrList = await this.fetchAllAddresses();
+    //     const ab = [];
+    //     if (addrList) {
+    //         const notes = await this.fetchNotes();
+    //         addrList.forEach((addr) => {                
+    //             // Sum of unspent UTXOs    
+    //             const utxoValue = notes.utxos
+    //                 .filter((n) => n.address == addr.address)
+    //                 .reduce((acc, curr) => acc + curr.value, 0);
 
-                // Sum of sapling notes   
-                const saplingValue = notes.unspent_sapling_notes
-                    .filter((n) => n.address == addr.address)
-                    .reduce((acc, curr) => acc + curr.value, 0);
+    //             // Sum of sapling notes   
+    //             const saplingValue = notes.unspent_sapling_notes
+    //                 .filter((n) => n.address == addr.address)
+    //                 .reduce((acc, curr) => acc + curr.value, 0);
 
-                // Sum of orchard notes
-                const orchardValue = notes.unspent_orchard_notes
-                    .filter((n) => n.address == addr.address)
-                    .reduce((acc, curr) => acc + curr.value, 0);
+    //             // Sum of orchard notes
+    //             const orchardValue = notes.unspent_orchard_notes
+    //                 .filter((n) => n.address == addr.address)
+    //                 .reduce((acc, curr) => acc + curr.value, 0);
 
-                const totalValue = (utxoValue + saplingValue + orchardValue);
-                if(totalValue > 0) {
-                    ab.push({
-                        address: addr.address,
-                        receivers: addr.receivers,
-                        balance: totalValue
-                    });
-                }
-            });
-        }
+    //             const totalValue = (utxoValue + saplingValue + orchardValue);
+    //             if(totalValue > 0) {
+    //                 ab.push({
+    //                     address: addr.address,
+    //                     receivers: addr.receivers,
+    //                     balance: totalValue
+    //                 });
+    //             }
+    //         });
+    //     }
 
-        return ab;
-    }
+    //     return ab;
+    // }
 
-    async getAddressAndValueFromTx(tx) {
-        const allNotes = await this.fetchNotes();
-        let notes = [];
-        const txid = tx.txid.toString();
-        // Try orchard notes
-        notes = allNotes.unspent_orchard_notes.filter((n) => n.created_in_txid == txid);
-        if(notes.length == 0) notes = allNotes.pending_orchard_notes.filter((n) => n.created_in_txid == txid);
+    // async getAddressAndValueFromTx(tx) {
+    //     const allNotes = await this.fetchNotes();
+    //     let notes = [];
+    //     const txid = tx.txid.toString();
+    //     // Try orchard notes
+    //     notes = allNotes.unspent_orchard_notes.filter((n) => n.created_in_txid == txid);
+    //     if(notes.length == 0) notes = allNotes.pending_orchard_notes.filter((n) => n.created_in_txid == txid);
     
-        // Try sapling notes
-        if(notes.length == 0) notes = allNotes.unspent_sapling_notes.filter((n) => n.created_in_txid == txid);
-        if(notes.length == 0) notes = allNotes.pending_sapling_notes.filter((n) => n.created_in_txid == txid);
+    //     // Try sapling notes
+    //     if(notes.length == 0) notes = allNotes.unspent_sapling_notes.filter((n) => n.created_in_txid == txid);
+    //     if(notes.length == 0) notes = allNotes.pending_sapling_notes.filter((n) => n.created_in_txid == txid);
 
-        // Try transparent utxos
-        if(notes.length == 0) notes = allNotes.utxos.filter((n) => n.created_in_txid == txid);
-        if(notes.length == 0) notes = allNotes.pending_utxos.filter((n) => n.created_in_txid == txid);
+    //     // Try transparent utxos
+    //     if(notes.length == 0) notes = allNotes.utxos.filter((n) => n.created_in_txid == txid);
+    //     if(notes.length == 0) notes = allNotes.pending_utxos.filter((n) => n.created_in_txid == txid);
         
-        const addrAndValue = notes.map((el) => {
-            return {
-                address: el.address,
-                value: el.value
-            }
-        });
-        return addrAndValue;
-    }
+    //     const addrAndValue = notes.map((el) => {
+    //         return {
+    //             address: el.address,
+    //             value: el.value
+    //         }
+    //     });
+    //     return addrAndValue;
+    // }
 
-    async shieldTransparent() {
-        console.log('shielding')
-        await native.zingolib_execute_async('quickshield','');
-        console.log('done shielding')
+    shieldTransparent() {
+        console.log('Trying to shield transparent funds ...')
+        try {
+            const resStr = native.zingolib_quick_shield();
+            const resJson = JSON.parse(resStr);
+            if(resJson.error) {
+                throw(`Internal Error shielding: ${resJson.error}`);
+            }
+
+            console.log("Succesfully shielded transparent funds.");
+            console.log(resJson.txids);
+        }
+        catch(err) {
+            console.log(err);
+        }        
     }
 
     async sendTransaction(sendJson) {
-         // First, get the previous send progress id, so we know which ID to track
-        const prevProgressStr = await native.zingolib_execute_async("sendprogress", "");
-        const prevProgressJSON = JSON.parse(prevProgressStr);
-        const prevSendId = prevProgressJSON.id;
-        let sendTxids = '';
-        let sendTxid = '';
-        
-        this.isSending = true;
-
-        // Propose a tx
-        try {
-            console.log(`Sending ${JSON.stringify(sendJson)}`);
-            const resp = await native.zingolib_execute_async("send", JSON.stringify(sendJson));            
-            console.log(`End Sending, response: ${resp}`); 
-        } 
-        catch(err) {
-            console.log(`Error sending Tx: ${err}`);
-            throw err;
-        }
-
-        // Confirm the tx ...
-        try {
-            console.log('Confirming');
-            const resp = await native.zingolib_execute_async("confirm", "");
-            console.log(`End Confirming, response: ${resp}`);
-            if (resp.toLowerCase().startsWith('error')) {
-                console.log(`Error confirming Tx: ${resp}`);
-                throw Error(resp);  
-            } 
-            else {
-                const respJSON = JSON.parse(resp);
-                if (respJSON.error) {
-                    console.log(`Error confirming Tx: ${respJSON.error}`);
-                    throw Error(respJSON.error);
-                } 
-                else if (respJSON.txids) {                    
-                    sendTxids = respJSON.txids.join(', ');
-                    sendTxid = respJSON.txids[0];
-                } 
-                else {
-                    console.log(`Error confirming: no error, no txids `);
-                    this.isSending = false;
-                    throw Error('Error confirming: no error, no txids');
-                }
-            }
-        } catch (err) {
-            console.log(`Error confirming Tx: ${err}`);
-            this.isSending = false;
-            throw err;
-        }
-        
-        // Return the promise, resolve with txid
         return new Promise((resolve, reject) => {
-            const intervalID = setInterval(async () => {
-                const progressStr = await native.zingolib_execute_async("sendprogress", "");
-                const progressJSON = JSON.parse(progressStr);
-
-                if (progressJSON.id === prevSendId  && !sendTxids) {
-                    // Still not started, so wait for more time
-                    return;
-                }
-
-                if (!progressJSON.txids && !progressJSON.error && !sendTxids) {
-                    // Still processing
-                    return;
-                }
-
-                // Finished processing
-                clearInterval(intervalID);
-                this.isSending = false;
-                if (progressJSON.txids) {
-                    // And refresh data (full refresh)
-                    this.doRefresh(true);
-            
-                    resolve(progressJSON.txids[0]);
-                }
-        
-                if (progressJSON.error) {
-                    reject(progressJSON.error);
-                }
-
-                if (sendTxids) {
-                    // And refresh data (full refresh)
-                    this.doRefresh(true);
-          
-                    resolve(sendTxid);
-                  }
-
-            }, 2 * 1000); // Every two seconds
-
+            native.zingolib_send(sendJson).then(fee => {
+                console.log(fee);
+                const txid = native.zingolib_confirm();
+                resolve(txid);
+            }).catch((err) => { 
+                console.log(err);
+                reject(err);
+            });
         });
     }
 
-    getTransactions(numTx) {
-        try {
-            const txnsStr = native.zingolib_get_value_transfers(numTx);
-            if (txnsStr) {
-                if (txnsStr.toLowerCase().startsWith('error')) {
-                    console.log(`Error wallet transactions ${txnsStr}`);
-                    return;
-                }
-            } else {
-                console.log('Internal Error wallet transactions');
-                return;
-            }
-            const txnsJSON = JSON.parse(txnsStr);
-            return txnsJSON;
-        }
-        catch (error) {
-            console.log(`Critical Error wallet transactions ${error}`);
-            return;
-        }
-    }
-
-    getTransactionsSummaries() {
-        try {
-            const txnsStr = native.zingolib_get_transaction_summaries();
-            if (txnsStr) {
-                if (txnsStr.toLowerCase().startsWith('error')) {
-                    console.log(`Error wallet transactions summaries ${txnsStr}`);
-                    return;
-                }
-            } else {
-                console.log('Internal Error wallet transactions summaries');
-                return;
-            }
-            const txnsJSON = JSON.parse(txnsStr);
-            return txnsJSON;
-        }
-        catch (error) {
-            console.log(`Critical Error wallet transactions summaries ${error}`);
-            return;
-        }
-    }
-
-    fetchLastTxId() {        
-        const txList =  native.zingolib_get_value_transfers(1);        
+    // async sendTransaction(sendJson) {
+    //      // First, get the previous send progress id, so we know which ID to track
+    //     const prevProgressStr = await native.zingolib_execute_async("sendprogress", "");
+    //     const prevProgressJSON = JSON.parse(prevProgressStr);
+    //     const prevSendId = prevProgressJSON.id;
+    //     let sendTxids = '';
+    //     let sendTxid = '';
         
-        const txListJson = JSON.parse(txList);
+    //     this.isSending = true;
+
+    //     // Propose a tx
+    //     try {
+    //         console.log(`Sending ${JSON.stringify(sendJson)}`);
+    //         const resp = await native.zingolib_execute_async("send", JSON.stringify(sendJson));            
+    //         console.log(`End Sending, response: ${resp}`); 
+    //     } 
+    //     catch(err) {
+    //         console.log(`Error sending Tx: ${err}`);
+    //         throw err;
+    //     }
+
+    //     // Confirm the tx ...
+    //     try {
+    //         console.log('Confirming');
+    //         const resp = await native.zingolib_execute_async("confirm", "");
+    //         console.log(`End Confirming, response: ${resp}`);
+    //         if (resp.toLowerCase().startsWith('error')) {
+    //             console.log(`Error confirming Tx: ${resp}`);
+    //             throw Error(resp);  
+    //         } 
+    //         else {
+    //             const respJSON = JSON.parse(resp);
+    //             if (respJSON.error) {
+    //                 console.log(`Error confirming Tx: ${respJSON.error}`);
+    //                 throw Error(respJSON.error);
+    //             } 
+    //             else if (respJSON.txids) {                    
+    //                 sendTxids = respJSON.txids.join(', ');
+    //                 sendTxid = respJSON.txids[0];
+    //             } 
+    //             else {
+    //                 console.log(`Error confirming: no error, no txids `);
+    //                 this.isSending = false;
+    //                 throw Error('Error confirming: no error, no txids');
+    //             }
+    //         }
+    //     } catch (err) {
+    //         console.log(`Error confirming Tx: ${err}`);
+    //         this.isSending = false;
+    //         throw err;
+    //     }
+        
+    //     // Return the promise, resolve with txid
+    //     return new Promise((resolve, reject) => {
+    //         const intervalID = setInterval(async () => {
+    //             const progressStr = await native.zingolib_execute_async("sendprogress", "");
+    //             const progressJSON = JSON.parse(progressStr);
+
+    //             if (progressJSON.id === prevSendId  && !sendTxids) {
+    //                 // Still not started, so wait for more time
+    //                 return;
+    //             }
+
+    //             if (!progressJSON.txids && !progressJSON.error && !sendTxids) {
+    //                 // Still processing
+    //                 return;
+    //             }
+
+    //             // Finished processing
+    //             clearInterval(intervalID);
+    //             this.isSending = false;
+    //             if (progressJSON.txids) {
+    //                 // And refresh data (full refresh)
+    //                 this.doRefresh(true);
+            
+    //                 resolve(progressJSON.txids[0]);
+    //             }
+        
+    //             if (progressJSON.error) {
+    //                 reject(progressJSON.error);
+    //             }
+
+    //             if (sendTxids) {
+    //                 // And refresh data (full refresh)
+    //                 this.doRefresh(true);
+          
+    //                 resolve(sendTxid);
+    //               }
+
+    //         }, 2 * 1000); // Every two seconds
+
+    //     });
+    // }
+
+    async getTransactions() {
+         const txns = await this.getTransactionsPromise();
+         return txns;
+    }
+
+    getTransactionsPromise() {
+        return new Promise((resolve, reject) => {
+            native.zingolib_get_value_transfers().then((txnsStr) => {
+                if (txnsStr) {
+                    if (txnsStr.toLowerCase().startsWith('error')) {
+                        console.log(`Error wallet transactions ${txnsStr}`);
+                        throw(txnsStr);
+                    }
+                } else {
+                    // console.log('Internal Error wallet transactions');
+                    throw("Internal Error wallet transactions");
+                }
+                const txnsJSON = JSON.parse(txnsStr);
+                resolve(txnsJSON);
+            }).catch((error) => {
+                // console.log(`Critical Error wallet transactions ${error}`);
+                reject(error);
+            });
+        });        
+    }
+
+    async fetchLastTxId() {        
+        const txListJson = await this.getTransactions();
+        
+        // const txListJson = JSON.parse(txList);
 
         if(txListJson && txListJson.value_transfers.length > 0) {
-            // console.log(txListJson.transaction_summaries)
             return txListJson.value_transfers[0].txid;
         }
         else return -1;
     }
 
-    async getDefaultFee() {        
-        const feeStr = await native.zingolib_execute_async('defaultfee', '');
-        if(feeStr) {
-            const feeJson = JSON.parse(feeStr);
-            return parseFloat((feeJson.defaultfee / 10**8).toFixed(8));
-        }
-        else return 10000; // Fail safe
-    }
-
-    async getWalletSeed() {
-        const seedStr = await native.zingolib_execute_async('seed', '');
-        if(seedStr) {
-            const seedJson = JSON.parse(seedStr);
-            return seedJson;
-        }
-        else return "Error: Couldn't get wallet seed.";
-    }
-
-    async getWalletUfvk() {
-        const ufvkStr = await native.zingolib_execute_async('exportufvk', '');
-        if(ufvkStr) {
-            const ufvkJson = JSON.parse(ufvkStr);
-            return ufvkJson;
-        }
-        else return "Error: Couldn't get wallet ufvk.";
-    }
-
-    async parseAddress(addr) {
+    getWalletSeed() {
         try {
-            const addrStr = await native.zingolib_execute_async('parse_address', addr);
-            if (addrStr) {
-                if (addrStr.toLowerCase().startsWith('error')) {
-                    console.log(`Error parsing address ${addrStr}`);
-                    return;
-                }
-            } else {
-                console.log('Internal Error parsing address');
-                return;
+            const seedStr = native.zingolib_get_seed();
+            if(seedStr) {
+                const seedJson = JSON.parse(seedStr);
+                return seedJson;
             }
-            const addrJSON = JSON.parse(addrStr);
-            return addrJSON;
+            else return "Error: Couldn't get wallet seed.";
+        }
+        catch(err) {
+            console.log(`Critical Error getting wallet seed: ${err}`);
+        }        
+    }
+
+    getWalletUfvk() {
+        try {
+            const ufvkStr = native.zingolib_get_ufvk();
+            if(ufvkStr) {
+                const ufvkJson = JSON.parse(ufvkStr);
+                return ufvkJson;
+            }
+            else return "Error: Couldn't get wallet ufvk.";
+        }
+        catch(err) {
+            console.log(`Critical Error getting wallet ufvk: ${err}`);
+        } 
+    }
+
+    parseAddress(addr) {
+        try {
+            const addrStr = native.zingolib_parse_address(addr);
+            if (addrStr) {
+                const addrJson = JSON.parse(addrStr);
+                return addrJson;               
+            } else {
+                throw('Internal Error parsing address');                
+            }            
         }
         catch (error) {
             console.log(`Critical Error parsing address ${error}`);
@@ -626,49 +680,39 @@ class ZingoLib {
         }
     }
 
-    decodeAddress(addr) {
-        try {
-            let res = native.zingolib_decode_ua(addr);
-            return res;
-        }
-        catch(err) {
-            // console.log(err);
-            return;
-        }
-    }
+    // decodeAddress(addr) {
+    //     try {
+    //         let res = native.zingolib_decode_ua(addr);
+    //         return res;
+    //     }
+    //     catch(err) {
+    //         // console.log(err);
+    //         return;
+    //     }
+    // }
 
     async createNewAddress() {
         try {
-            const addrStr = await native.zingolib_execute_async('new', 'zto');
-            if (addrStr) {
-                if (addrStr.toLowerCase().startsWith('error')) {
-                    console.log(`Error creating address ${addrStr}`);
-                    return;
-                }
-            } else {
-                console.log('Internal Error creating address');
-                return;
+            const addrStr = native.zingolib_create_new_unified_address('oz');
+            if (addrStr.toLowerCase().startsWith('error')) {
+                throw(`Error creating address ${addrStr}`);
             }
-
-            const addrNew = JSON.parse(addrStr);
-            const allAddr = await this.fetchAllAddresses();
-            const addrDetails = allAddr.filter((addr) => addr.address == addrNew[0]);
-
-
-            return addrDetails[0];
+            const addrJson = JSON.parse(addrStr);
+            return addrJson;
         }
-        catch (error) {
-            console.log(`Critical Error parsing address ${error}`);
-            return;
+        catch(err) {
+            console.log(err);
+            return err;
         }
     }
 
-    async deinitialize() {
+    deinitialize() {
         console.log("Safely shutting down zingolib ... ");
-        await this.stopSyncProcess();
-        await native.zingolib_execute_async('quit', '');
+        // this.stopSyncProcess();
+        this.doSaveWallet();
+        // await native.zingolib_execute_async('quit', '');
         process.exit();
-    }
+    }   
 }
 
 module.exports = ZingoLib;
