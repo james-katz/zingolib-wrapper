@@ -24,8 +24,9 @@ pnpm-debug.log*
 native.node
 index.node
 native/target
+dist/
+native/dist
 
 
 # Added by cargo
-
 /target

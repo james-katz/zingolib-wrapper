@@ -41,8 +41,8 @@ client.init().then(async (res)=> {
     // console.log(notes)
     
     // Get last txid
-    //  const txid = await client.fetchLastTxId();
-    //  console.log(txid);
+     const txid = await client.fetchLastTxId();
+     console.log(txid);
 
     // Get last transaction details (uncomment previous txid line)
     // const tx = await client.getTransactions();    
@@ -53,12 +53,12 @@ client.init().then(async (res)=> {
     // console.log(txAddrVal)
      
     //Get all transactions
-    /*
+    
     client.getTransactionsPromise().then(txns => {
         // console.log(txns);
         
         // And filter recevied tx only (uncomment previous txns line)
-        const r = txns.value_transfers.filter((t) => t.kind == 'received');
+        const r = txns.value_transfers.filter((t) => t.kind == 'sent');
         let txCount = 0;
         for(const rx of r) {
             console.log(rx);
@@ -66,7 +66,7 @@ client.init().then(async (res)=> {
             if(txCount >= 1) break;
         }
     });
-    */
+    
    
     // Get the wallet seed
     // const seed = await client.getWalletSeed();

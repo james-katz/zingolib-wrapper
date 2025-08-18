@@ -1,31 +1,26 @@
-// #[macro_use]
+use node_bindgen::derive::node_bindgen;
+
 extern crate lazy_static;
 
 use bip0039::Mnemonic;
 use lazy_static::lazy_static;
 
-use neon::prelude::*;
-use structs::NeonAccountBalance;
 use tokio::runtime::Runtime;
 use zcash_address::ZcashAddress;
 use zcash_protocol::{memo::MemoBytes, value::Zatoshis};
-use zingolib::{config::{construct_lightwalletd_uri, ChainType, ZingoConfig}, data::{proposal::total_fee, receivers::{transaction_request_from_receivers, Receivers}, PollReport}, lightclient, wallet::{keys::unified::ReceiverSelection, LightWallet, WalletBase, WalletSettings}};
+use zingolib::{config::{construct_lightwalletd_uri, ChainType, ZingoConfig}, data::{proposal::total_fee, receivers::{transaction_request_from_receivers, Receivers}, PollReport}, wallet::{keys::unified::ReceiverSelection, LightWallet, WalletBase, WalletSettings}};
 use zingolib::lightclient::LightClient;
 use zingo_infra_services::network::ActivationHeights;
 
-use std::{fs::File, io::Write, sync::{Arc, RwLock}, thread};
+use std::{fs::File, io::Write, sync::RwLock};
 
 use pepper_sync::{config::{PerformanceLevel, SyncConfig, TransparentAddressDiscovery}, wallet::{OrchardNote, SaplingNote, SyncMode}};
 use rustls::crypto::ring::default_provider;
 use rustls::crypto::CryptoProvider;
-use zcash_client_backend::{address::{Address, UnifiedAddress}, keys::UnifiedFullViewingKey};
-use zcash_client_backend::encoding::{AddressCodec, encode_payment_address};
-use zcash_primitives::{consensus::{BlockHeight, MainNetwork}, zip32::AccountId};
-use zcash_primitives::constants::mainnet::HRP_SAPLING_PAYMENT_ADDRESS;
+use zcash_client_backend::{address::Address, keys::UnifiedFullViewingKey};
+use zcash_primitives::{consensus::BlockHeight, zip32::AccountId};
 
 use std::num::NonZeroU32;
-
-mod structs;
 
 // // We'll use a MUTEX to store a global lightclient instance,
 // // so we don't have to keep creating it. We need to store it here, in rust
@@ -42,43 +37,44 @@ fn store_client(lightclient: LightClient) {
     LIGHTCLIENT.write().unwrap().replace(lightclient);
 }
 
-#[neon::main]
-fn main(mut cx: ModuleContext) -> NeonResult<()> {
-    cx.export_function("sayHello", say_hello)?;
-    cx.export_function("zingolib_wallet_exists", wallet_exists)?;
-    cx.export_function("zingolib_init_new", init_new)?;
-    cx.export_function("zingolib_init_from_seed_phrase", init_from_seed_phrase)?;
-    cx.export_function("zingolib_init_from_ufvk", init_from_ufvk)?;
-    cx.export_function("zingolib_init_from_disk", init_from_disk)?;
-    cx.export_function("zingolib_save_wallet", save_wallet)?;
-    cx.export_function("zingolib_save_wallet_task", save_wallet_task)?;
-    cx.export_function("zingolib_get_latest_block_server", get_latest_block_server)?;
-    cx.export_function("zingolib_get_latest_block_wallet", get_latest_block_wallet)?;
-    cx.export_function("zingolib_get_notes", get_notes)?;
-    cx.export_function("zingolib_get_balance", get_balance)?;
-    cx.export_function("zingolib_get_spendable_balance_total", get_spendable_balance_total)?;
-    cx.export_function("zingolib_get_unified_addresses", get_unified_addresses)?;
-    cx.export_function("zingolib_create_new_unified_address", create_new_unified_address)?;
-    cx.export_function("zingolib_parse_address", parse_address)?;
-    cx.export_function("zingolib_run_rescan", run_rescan)?;
-    cx.export_function("zingolib_run_sync", run_sync)?;
-    cx.export_function("zingolib_pause_sync", pause_sync)?;
-    cx.export_function("zingolib_stop_sync", stop_sync)?;
-    cx.export_function("zingolib_status_sync", status_sync)?;
-    cx.export_function("zingolib_poll_sync", poll_sync)?;
-    cx.export_function("zingolib_get_value_transfers", get_value_transfers)?;
-    cx.export_function("zingolib_get_seed", get_seed)?;
-    cx.export_function("zingolib_get_ufvk", get_ufvk)?;
-    cx.export_function("zingolib_send", send)?;
-    cx.export_function("zingolib_confirm", confirm)?;
-    cx.export_function("zingolib_quick_shield", quick_shield)?;    
-    cx.export_function("zingolib_set_crypto_default_provider_to_ring", set_crypto_default_provider_to_ring)?;
+// #[neon::main]
+// fn main(mut cx: ModuleContext) -> NeonResult<()> {
+//     cx.export_function("sayHello", say_hello)?;
+//     cx.export_function("zingolib_wallet_exists", wallet_exists)?;
+//     cx.export_function("zingolib_init_new", init_new)?;
+//     cx.export_function("zingolib_init_from_seed_phrase", init_from_seed_phrase)?;
+//     cx.export_function("zingolib_init_from_ufvk", init_from_ufvk)?;
+//     cx.export_function("zingolib_init_from_disk", init_from_disk)?;
+//     cx.export_function("zingolib_save_wallet", save_wallet)?;
+//     cx.export_function("zingolib_save_wallet_task", save_wallet_task)?;
+//     cx.export_function("zingolib_get_latest_block_server", get_latest_block_server)?;
+//     cx.export_function("zingolib_get_latest_block_wallet", get_latest_block_wallet)?;
+//     cx.export_function("zingolib_get_notes", get_notes)?;
+//     cx.export_function("zingolib_get_balance", get_balance)?;
+//     cx.export_function("zingolib_get_spendable_balance_total", get_spendable_balance_total)?;
+//     cx.export_function("zingolib_get_unified_addresses", get_unified_addresses)?;
+//     cx.export_function("zingolib_create_new_unified_address", create_new_unified_address)?;
+//     cx.export_function("zingolib_parse_address", parse_address)?;
+//     cx.export_function("zingolib_run_rescan", run_rescan)?;
+//     cx.export_function("zingolib_run_sync", run_sync)?;
+//     cx.export_function("zingolib_pause_sync", pause_sync)?;
+//     cx.export_function("zingolib_stop_sync", stop_sync)?;
+//     cx.export_function("zingolib_status_sync", status_sync)?;
+//     cx.export_function("zingolib_poll_sync", poll_sync)?;
+//     cx.export_function("zingolib_get_value_transfers", get_value_transfers)?;
+//     cx.export_function("zingolib_get_seed", get_seed)?;
+//     cx.export_function("zingolib_get_ufvk", get_ufvk)?;
+//     cx.export_function("zingolib_send", send)?;
+//     cx.export_function("zingolib_confirm", confirm)?;
+//     cx.export_function("zingolib_quick_shield", quick_shield)?;    
+//     cx.export_function("zingolib_set_crypto_default_provider_to_ring", set_crypto_default_provider_to_ring)?;
     
-    Ok(())
-}
+//     Ok(())
+// }
 
-fn say_hello(mut cx: FunctionContext) -> JsResult<JsString> {
-    Ok(cx.string("Hello from Rust!".to_string()))
+#[node_bindgen]
+fn say_hello() -> String {
+    "Hello from Rust!".to_string()
 }
 
 fn construct_uri_load_config(
@@ -116,33 +112,29 @@ fn construct_uri_load_config(
 }
 
 /// Check if there is an existing wallet
-fn wallet_exists(mut cx: FunctionContext) -> JsResult<JsBoolean> {
-    let server_uri = cx.argument::<JsString>(0)?.value(&mut cx);
-    let chain_hint = cx.argument::<JsString>(1)?.value(&mut cx);
-    
+#[node_bindgen]
+fn wallet_exists(server_uri: String, chain_hint: String) -> Result<bool, bool> {    
     let (config, _lightwalletd_uri);
     match construct_uri_load_config(server_uri, chain_hint) {
         Ok((c, h)) => (config, _lightwalletd_uri) = (c, h),
-        Err(_) => return Ok(cx.boolean(false)),
+        Err(_) => return Err(false),
     };
    
-    Ok(cx.boolean(config.wallet_path_exists()))
+    Ok(config.wallet_path_exists())
 }
 
-fn init_new(mut cx: FunctionContext) -> JsResult<JsString> {
-    let server_uri = cx.argument::<JsString>(0)?.value(&mut cx);
-    let chain_hint = cx.argument::<JsString>(1)?.value(&mut cx);
-    
+#[node_bindgen]
+fn init_new(server_uri: String, chain_hint: String) -> Result<String, String> {    
     let (config, lightwalletd_uri) = match construct_uri_load_config(server_uri, chain_hint) {
         Ok(c) => c,
-        Err(e) => return cx.throw_error(format!("{e}")),
+        Err(e) => return Err(format!("{e}")),
     };
     let latest_block_height = match RT
         .block_on(async move { zingolib::grpc_connector::get_latest_block(lightwalletd_uri).await })
     {
         Ok(block_id) => block_id.height,
         Err(e) => {
-            return cx.throw_error(format!("Error: {e}"));
+            return Err(format!("Error: {e}"));
         }
     };
     let lightclient = match LightClient::new(
@@ -152,30 +144,26 @@ fn init_new(mut cx: FunctionContext) -> JsResult<JsString> {
     ) {
         Ok(l) => l,
         Err(e) => {
-            return cx.throw_error(format!("Error: {e}"));
+            return Err(format!("Error: {e}"));
         }
     };
     store_client(lightclient);
 
-    Ok(cx.string("Lightclient initialized from fresh entropy."))
+    Ok("Lightclient initialized from fresh entropy.".to_string())
 }
 
 /// Initialize a lightclient from mnemonic phrase
-fn init_from_seed_phrase(mut cx: FunctionContext) -> JsResult<JsString> {
-    let server_uri = cx.argument::<JsString>(0)?.value(&mut cx);
-    let seed = cx.argument::<JsString>(1)?.value(&mut cx);
-    let birthday = cx.argument::<JsNumber>(2)?.value(&mut cx);
-    let chain_hint = cx.argument::<JsString>(3)?.value(&mut cx);
-    
+#[node_bindgen]
+fn init_from_seed_phrase(server_uri: String, seed: String, birthday: i32, chain_hint: String) -> Result<String, String> {
     let (config, _lightwalletd_uri) = match construct_uri_load_config(server_uri, chain_hint) {
         Ok(c) => c,
-        Err(e) => return cx.throw_error(format!("{e}")),
+        Err(e) => return Err(format!("{e}")),
     };
     
     let mnemonic = match Mnemonic::from_phrase(seed) {
         Ok(m) => m,
         Err(e) => {
-            return cx.throw_error(format!("Error: {e}"));
+            return Err(format!("Error: {e}"));
         }
     };
     let wallet = match LightWallet::new(
@@ -188,29 +176,25 @@ fn init_from_seed_phrase(mut cx: FunctionContext) -> JsResult<JsString> {
         config.wallet_settings.clone(),
     ) {
         Ok(w) => w,
-        Err(e) => return cx.throw_error(format!("Error: {e}")),
+        Err(e) => return Err(format!("Error: {e}")),
     };
     let lightclient = match LightClient::create_from_wallet(wallet, config, false) {
         Ok(l) => l,
         Err(e) => {
-            return cx.throw_error(format!("Error: {e}"));
+            return Err(format!("Error: {e}"));
         }
     };
     store_client(lightclient);
 
-    Ok(cx.string("Lightclient initialized from seed phrase."))
+    Ok("Lightclient initialized from seed phrase.".to_string())
 }
 
 /// Initialize a lightclient from a UFVK
-fn init_from_ufvk(mut cx: FunctionContext) -> JsResult<JsString> {
-    let server_uri = cx.argument::<JsString>(0)?.value(&mut cx);
-    let ufvk = cx.argument::<JsString>(1)?.value(&mut cx);
-    let birthday = cx.argument::<JsNumber>(2)?.value(&mut cx);
-    let chain_hint = cx.argument::<JsString>(3)?.value(&mut cx);
-
+#[node_bindgen]
+fn init_from_ufvk(server_uri: String, ufvk: String, birthday: i32, chain_hint: String) -> Result<String, String> {
     let (config, _lightwalletd_uri) = match construct_uri_load_config(server_uri, chain_hint) {
         Ok(c) => c,
-        Err(e) => return cx.throw_error(format!("{e}")),
+        Err(e) => return Err(format!("{e}")),
     };
 
     let wallet = match LightWallet::new(
@@ -220,46 +204,44 @@ fn init_from_ufvk(mut cx: FunctionContext) -> JsResult<JsString> {
         config.wallet_settings.clone(),
     ) {
         Ok(w) => w,
-        Err(e) => return cx.throw_error(format!("Error: {e}")),
+        Err(e) => return Err(format!("Error: {e}")),
     };
 
     let lightclient = match LightClient::create_from_wallet(wallet, config, false) {
         Ok(l) => l,
         Err(e) => {
-            return cx.throw_error(format!("Error: {e}"));
+            return Err(format!("Error: {e}"));
         }
     };
 
     store_client(lightclient);
     
-    Ok(cx.string("Lightclient initialized from UFVK."))
+    Ok("Lightclient initialized from UFVK.".to_string())
 }
 
 /// Initialize a lightclient from an existing wallet file 
-fn init_from_disk(mut cx: FunctionContext) -> JsResult<JsString> {
-    let server_uri = cx.argument::<JsString>(0)?.value(&mut cx);
-    let chain_hint = cx.argument::<JsString>(1)?.value(&mut cx);
-    
+#[node_bindgen]
+fn init_from_disk(server_uri: String, chain_hint: String) -> Result<String, String> {    
     let (config, _lightwalletd_uri) = match construct_uri_load_config(server_uri, chain_hint) {
         Ok(c) => c,
-        Err(e) => return cx.throw_error(format!("Error: {}", e)),
+        Err(e) => return Err(format!("Error: {}", e)),
     };
 
     println!("{:?}", config.clone().get_wallet_path());
 
-
     let lightclient = match LightClient::create_from_wallet_path(config) {
         Ok(w) => w,
-        Err(e) => return cx.throw_error(format!("{}", e)),
+        Err(e) => return Err(format!("{}", e)),
     };
 
 
     store_client(lightclient);
 
-    Ok(cx.string("Lightclient initialized from disk."))
+    Ok("Lightclient initialized from disk.".to_string())
 }
 
-fn save_wallet(mut cx: FunctionContext) -> JsResult<JsString> {
+#[node_bindgen]
+fn save_wallet() -> Result<String, String> {
     // Get the wallet as a base64 encoded string
     // And save it to a wallet file
     if let Some(lightclient) = &mut *LIGHTCLIENT.write().unwrap() {        
@@ -270,83 +252,69 @@ fn save_wallet(mut cx: FunctionContext) -> JsResult<JsString> {
 
                     let mut file = match File::create(wallet_path) {
                         Ok(f) => f,
-                        Err(e) => return cx.throw_error(format!("Error: {}", e.to_string())),
+                        Err(e) => return Err(format!("Error: {}", e.to_string())),
                     };
                     // Try to write wallet_bytes to file
                     match file.write_all(&wallet_bytes) {
-                        Ok(()) => Ok(cx.string("Wallet file saved.")),
-                        Err(e) => return cx.throw_error(format!("Error {}", e.to_string())),
+                        Ok(()) => Ok("Wallet file saved.".to_string()),
+                        Err(e) => return Err(format!("Error {}", e.to_string())),
                     }                  
                 },
                 // TODO: check this is better than a custom error when save is not required (empty buffer)
-                Ok(None) => Ok(cx.string("No need to save the wallet file")),
-                Err(e) => return cx.throw_error(format!("Error: {}", e)),
+                Ok(None) => Ok("No need to save the wallet file".to_string()),
+                Err(e) => return Err(format!("Error: {}", e)),
             }
         })
     } else {
-        cx.throw_error("Error: Lightclient is not initialized")
+        return Err("Error: Lightclient is not initialized".to_string())
     }
 }
 
-fn save_wallet_task(mut cx: FunctionContext) -> JsResult<JsString> {
+#[node_bindgen]
+fn save_wallet_task() -> Result<String, String> {
     if let Some(lightclient) = &mut *LIGHTCLIENT.write().unwrap() {
         RT.block_on(async move {
             let _task = lightclient.save_task().await;
-            Ok(cx.string("Save task launched."))
+            Ok("Save task launched.".to_string())
         })                
     } else {
-        return cx.throw_error("Error: Lightclient is not initialized")
+        return Err("Error: Lightclient is not initialized".to_string())
     }
 }
 
-// TODO: deprecate
-// pub fn execute_command(cmd: String, args_list: String) -> String {
-//     if let Some(lightclient) = &mut *LIGHTCLIENT.write().unwrap() {
-//         let args = if args_list.is_empty() {
-//             vec![]
-//         } else {
-//             vec![args_list.as_ref()]
-//         };
-//         zingolib::commands::do_user_command(&cmd, &args, lightclient)
-//     } else {
-//         "Error: Lightclient is not initialized".to_string()
-//     }
-// }
-
-fn get_latest_block_server(mut cx: FunctionContext) -> JsResult<JsString> {
-    let server_uri = cx.argument::<JsString>(0)?.value(&mut cx);
-
+#[node_bindgen]
+fn get_latest_block_server(server_uri: String) -> Result<String, String> {
     let lightwalletd_uri = match server_uri.parse() {
         Ok(uri) => uri,
         Err(e) => {
-            return cx.throw_error(format!("Error: failed to parse uri. {e}"));
+            return Err(format!("Error: failed to parse uri. {e}"));
         }
     };
     let height = match RT
         .block_on(async move { zingolib::grpc_connector::get_latest_block(lightwalletd_uri).await })
     {
         Ok(block_id) => block_id.height.to_string(),
-        Err(e) => return cx.throw_error(format!("Error: {e}")),
+        Err(e) => return Err(format!("Error: {e}")),
     };
 
-    Ok(cx.string(height))
+    Ok(height)
 }
 
-fn get_latest_block_wallet(mut cx: FunctionContext) -> JsResult<JsObject> {
-    let obj = cx.empty_object();
-    if let Some(lightclient) = &*LIGHTCLIENT.read().unwrap() {
-        RT.block_on(async move {
-            let height = cx.number(lightclient.wallet.write().await.sync_state.fully_scanned_height().map(u32::from).unwrap_or(0));
-            obj.set(&mut cx, "height", height).expect("Error fetching wallet height.");            
+#[node_bindgen]
+fn get_latest_block_wallet() -> Result<String, String> {
+    if let Some(lightclient) = &*LIGHTCLIENT.write().unwrap() {
+        let height = RT.block_on(async move {
+            lightclient.wallet.read().await.sync_state.fully_scanned_height().map(u32::from).unwrap_or(0)
         });
-        Ok(obj)
+        Ok(json::object! {"height" => height}.pretty(2))
     } else {
-        return cx.throw_error("Error: Lightclient is not initialized");
+        return Err("Error: Lightclient is not initialized".to_string());
     }
 }
 
-fn get_notes(mut cx: FunctionContext) -> JsResult<JsString> {
-    let all_notes = if cx.argument::<JsBoolean>(0)?.value(&mut cx) {
+#[node_bindgen]
+fn get_notes(spent: bool) -> Result<String, String> {
+    let all_notes = if spent {
         true
     } else {
         false
@@ -364,56 +332,56 @@ fn get_notes(mut cx: FunctionContext) -> JsResult<JsString> {
             .pretty(2)
         });
 
-        Ok(cx.string(notes))
+        Ok(notes)
     }
     else {
-        return cx.throw_error("Error: Lightclient is not initialized");
+        return Err("Error: Lightclient is not initialized".to_string());
     }
 }
 
-fn get_balance(mut cx: FunctionContext) -> JsResult<JsObject> {        
+#[node_bindgen]
+fn get_balance() -> Result<String, String> {        
     if let Some(lightclient) = &*LIGHTCLIENT.read().unwrap() {
-        let obj = RT.block_on(async move {
-            let balance = lightclient.account_balance(AccountId::ZERO).await.expect("Error getting AccountBalance");
-            let neon_balance = NeonAccountBalance::new(balance).expect("Error creating NeonAccountBalance");
-            
-            neon_balance.to_object(&mut cx).expect("Error converting NeonAccountBalance to JsObject")
-        });
-        
-        Ok(obj)    
+        RT.block_on(async move {
+            match lightclient
+                .account_balance(AccountId::ZERO)
+                .await
+            {
+                Ok(bal) => Ok(json::JsonValue::from(bal).pretty(2)),
+                Err(e) => return Err(format!("Error: {e}")),
+            }            
+        })
     } else {
-        return cx.throw_error("Error: Lightclient is not initialized".to_string())
+        return Err("Error: Lightclient is not initialized".to_string())
     }
 }
 
-fn get_spendable_balance_total(mut cx: FunctionContext) -> JsResult<JsObject> {
-    let obj = cx.empty_object();
-    
+#[node_bindgen]
+fn get_spendable_balance_total() -> Result<i64, String> {    
     if let Some(lightclient) = &*LIGHTCLIENT.read().unwrap() {
         RT.block_on(async move {
             let wallet = lightclient.wallet.write().await;
-            let spendable_balance = match wallet.shielded_spendable_balance(AccountId::ZERO, false) {
-                Ok(bal) => cx.number(bal.into_u64() as f64),
-                Err(e) => return cx.throw_error(format!("Error {}", e)),
-            };
-            obj.set(&mut cx, "spendable_balance", spendable_balance).expect("Error setting spensable_balance");
-            Ok(obj)
-        })      
+            match wallet.shielded_spendable_balance(AccountId::ZERO, false) {
+                Ok(bal) => Ok(bal.into_u64() as i64),
+                Err(e) => return Err(format!("Error {}", e)),
+            }
+        })
     } else {
-        return cx.throw_error("Error: Lightclient is not initialized")
+        return Err("Error: Lightclient is not initialized".to_string())
     }
 }
 
-fn get_unified_addresses(mut cx: FunctionContext) -> JsResult<JsString> {
+#[node_bindgen]
+fn get_unified_addresses() -> Result<String, String> {
     if let Some(lightclient) = &*LIGHTCLIENT.read().unwrap() {
-        RT.block_on(async move { Ok(cx.string(lightclient.unified_addresses_json().await.pretty(2))) })
+        RT.block_on(async move { Ok(lightclient.unified_addresses_json().await.pretty(2)) })
     } else {
-        return cx.throw_error("Error: Lightclient is not initialized")
+        return Err("Error: Lightclient is not initialized".to_string())
     }
 }
 
-fn create_new_unified_address(mut cx: FunctionContext) -> JsResult<JsString> {
-    let receivers = cx.argument::<JsString>(0)?.value(&mut cx);
+#[node_bindgen]
+fn create_new_unified_address(receivers: String) -> Result<String, String> {
     if let Some(lightclient) = &mut *LIGHTCLIENT.write().unwrap() {
         RT.block_on(async move {
             let mut wallet = lightclient.wallet.write().await;
@@ -422,31 +390,31 @@ fn create_new_unified_address(mut cx: FunctionContext) -> JsResult<JsString> {
                 orchard: receivers.contains('o'),
                 sapling: receivers.contains('z'),
             };
-            let ua = match wallet.generate_unified_address(receivers_available, AccountId::ZERO) {
+            match wallet.generate_unified_address(receivers_available, AccountId::ZERO) {
                 Ok((id, unified_address)) => {
-                    json::object! {
-                        "account" => u32::from(AccountId::ZERO),
-                        "address_index" => id.address_index,
-                        "has_orchard" => unified_address.has_orchard(),
-                        "has_sapling" => unified_address.has_sapling(),
-                        "has_transparent" => unified_address.has_transparent(),
-                        "encoded_address" => unified_address.encode(&network),
-                    }.pretty(2)
+                    Ok(
+                        json::object! {
+                            "account" => u32::from(AccountId::ZERO),
+                            "address_index" => id.address_index,
+                            "has_orchard" => unified_address.has_orchard(),
+                            "has_sapling" => unified_address.has_sapling(),
+                            "has_transparent" => unified_address.has_transparent(),
+                            "encoded_address" => unified_address.encode(&network),
+                        }.pretty(2)
+                    )
                 }
-                Err(e) => return cx.throw_error(format!("Error: {e}")),
-            };
-            Ok(cx.string(ua))
+                Err(e) => return Err(format!("Error: {e}")),
+            }
         })
     } else {
-        return cx.throw_error("Error: Lightclient is not initialized")
+        return Err("Error: Lightclient is not initialized".to_string())
     }
 }
 
-fn parse_address(mut cx: FunctionContext) -> JsResult<JsString> {
-    let address = cx.argument::<JsString>(0)?.value(&mut cx);
-    
+#[node_bindgen]
+fn parse_address(address: String) -> Result<String, String> {    
     if address.is_empty() {
-        return cx.throw_error("Error: The address is empty")
+        return Err("Error: The address is empty".to_string())
     } else {
         fn make_decoded_chain_pair(
             address: &str,
@@ -513,87 +481,91 @@ fn parse_address(mut cx: FunctionContext) -> JsResult<JsString> {
                     }
                 }
             };
-            Ok(cx.string(parsed))
+            Ok(parsed)
         } else {
-            Ok(cx.string(json::object! {
+            Ok(json::object! {
                 "status" => "Invalid address",
                 "chain_name" => json::JsonValue::Null,
                 "address_kind" => json::JsonValue::Null,
             }
-            .pretty(2)))
+            .pretty(2))
         }
     }
 }
 
-fn run_rescan(mut cx: FunctionContext) -> JsResult<JsString> {
+#[node_bindgen]
+fn run_rescan() -> Result<String, String> {
     if let Some(lightclient) = &mut *LIGHTCLIENT.write().unwrap() {
         RT.block_on(async move {
             match lightclient.rescan().await {
-                Ok(_) => Ok(cx.string("Launching rescan...")),
-                Err(e) => return cx.throw_error(format!("Error: {e}")),
+                Ok(_) => Ok("Launching rescan...".to_string()),
+                Err(e) => return Err(format!("Error: {e}")),
             }
         })
     } else {
-        return cx.throw_error("Error: Lightclient is not initialized")
+        return Err("Error: Lightclient is not initialized".to_string())
     }
 }
 
-fn run_sync(mut cx: FunctionContext) -> JsResult<JsString> {
+#[node_bindgen]
+fn run_sync() -> Result<String, String> {
     if let Some(lightclient) = &mut *LIGHTCLIENT.write().unwrap() {
         if lightclient.sync_mode() == SyncMode::Paused {
             lightclient.resume_sync().expect("sync should be paused");
-            Ok(cx.string("Resuming sync task..."))
+            Ok("Resuming sync task...".to_string())
         } else {
             RT.block_on(async move {
-                let resp = match lightclient.sync().await {
-                    Ok(_) => "Launching sync task...".to_string(),
-                    Err(e) => format!("Error: {e}"),
-                };
-                Ok(cx.string(resp))
+                match lightclient.sync().await {
+                    Ok(_) => Ok("Launching sync task...".to_string()),
+                    Err(e) => return Err(format!("Error: {e}")),
+                }
             })
         }
     } else {
-        return cx.throw_error("Error: Lightclient is not initialized")
+        return Err("Error: Lightclient is not initialized".to_string())
     }
 }
 
-fn pause_sync(mut cx: FunctionContext) -> JsResult<JsString> {
+#[node_bindgen]
+fn pause_sync() -> Result<String, String> {
     if let Some(lightclient) = &mut *LIGHTCLIENT.write().unwrap() {
         match lightclient.pause_sync() {
-            Ok(_) => Ok(cx.string("Pausing sync task...")),
-            Err(e) => cx.throw_error(format!("Error: {e}")),
+            Ok(_) => Ok("Pausing sync task...".to_string()),
+            Err(e) => return Err(format!("Error: {e}")),
         }        
     } else {
-        return cx.throw_error("Error: Lightclient is not initialized")
+        return Err("Error: Lightclient is not initialized".to_string())
     }
 }
 
-fn stop_sync(mut cx: FunctionContext) -> JsResult<JsString> {
+#[node_bindgen]
+fn stop_sync() -> Result<String, String> {
     if let Some(lightclient) = &mut *LIGHTCLIENT.write().unwrap() {
         match lightclient.stop_sync() {
-            Ok(_) => Ok(cx.string("Stopping sync task...")),
-            Err(e) => return cx.throw_error(format!("Error: {e}")),
+            Ok(_) => Ok("Stopping sync task...".to_string()),
+            Err(e) => return Err(format!("Error: {e}")),
         }
     } else {
-        return cx.throw_error("Error: Lightclient is not initialized")
+        return Err("Error: Lightclient is not initialized".to_string())
     }
 }
 
-fn status_sync(mut cx: FunctionContext) -> JsResult<JsString> {
+#[node_bindgen]
+fn status_sync() -> Result<String, String> {
     if let Some(lightclient) = &*LIGHTCLIENT.read().unwrap() {
         RT.block_on(async move {
-            let status_sync = match pepper_sync::sync_status(&*lightclient.wallet.read().await).await {
-                Ok(status) => json::JsonValue::from(status).pretty(2),
-                Err(e) => format!("Error: {e}"),
-            };
-            Ok(cx.string(status_sync))
+            match pepper_sync::sync_status(&*lightclient.wallet.read().await).await {
+                Ok(status) => Ok(json::JsonValue::from(status).pretty(2)),
+                Err(e) => return Err(format!("Error: {e}")),
+            }
         })
     } else {
-        return cx.throw_error("Error: Lightclient is not initialized")
+        return Err("Error: Lightclient is not initialized".to_string())
     }
 }
 
-fn poll_sync(mut cx: FunctionContext) -> JsResult<JsString> {
+#[node_bindgen]
+fn poll_sync() -> Result<String, String> {
     if let Some(lightclient) = &mut *LIGHTCLIENT.write().unwrap() {
         let poll_sync = match lightclient.poll_sync() {
             PollReport::NoHandle => "Sync task has not been launched.".to_string(),
@@ -603,79 +575,47 @@ fn poll_sync(mut cx: FunctionContext) -> JsResult<JsString> {
                     json::object! { "sync_complete" => json::JsonValue::from(sync_result) }
                         .pretty(2)
                 }
-                Err(e) => format!("Error: {e}"),
+                Err(e) => return Err(format!("Error: {e}")),
             },
         };
-        Ok(cx.string(poll_sync))
+        Ok(poll_sync)
     } else {
-        return cx.throw_error("Error: Lightclient is not initialized")
+        return Err("Error: Lightclient is not initialized".to_string())
     }
 }
-fn get_value_transfers(mut cx: FunctionContext) -> JsResult<JsPromise> {
-    let promise = cx.task(move || {
-        if let Some(lightclient) = &*LIGHTCLIENT.read().unwrap() {
-            RT.block_on(async move {
-                let vt = match lightclient
-                    .wallet
-                    .read()
-                    .await
-                    .value_transfers(true)
-                    .await
-                {
-                    Ok(value_transfers) => json::JsonValue::from(value_transfers).pretty(2),
-                    Err(e) => format!("Error: {e}"),
-                };
-                Ok(vt)
-            })
-        } else {
-            Err("Error: Lightclient is not initialized")
-        }
-    }).promise(|mut cx, vt| {
-        match vt {
-            Ok(vts) => Ok(cx.string(vts)),
-            Err(e) => return cx.throw_error(e)
-        }
-    });
 
-    Ok(promise)
+#[node_bindgen]
+async fn get_value_transfers_async() -> Result<String, String> {
+    let wallet = {
+        let guard = LIGHTCLIENT.read().map_err(|_| "Lock poisoned".to_string())?;
+        let lc = guard.as_ref().ok_or_else(|| "Error: Lightclient is not initialized".to_string())?;
+        lc.wallet.clone()
+    };
+
+    let wallet_guard = wallet.read().await;
+    match wallet_guard.value_transfers(true).await {
+        Ok(vt)  => Ok(json::JsonValue::from(vt).pretty(2)),
+        Err(e)  => Err(format!("Error: {e}")),
+    }
 }
 
-// fn get_value_transfers_blocking(mut cx: FunctionContext) -> JsResult<JsString> {
-//     if let Some(lightclient) = &*LIGHTCLIENT.read().unwrap() {
-//         RT.block_on(async move {
-//             let vt = match lightclient
-//                 .wallet
-//                 .read()
-//                 .await
-//                 .value_transfers(true)
-//                 .await
-//             {
-//                 Ok(value_transfers) => json::JsonValue::from(value_transfers).pretty(2),
-//                 Err(e) => format!("Error: {e}"),
-//             };
-//             Ok(cx.string(vt))
-//         })
-//     } else {
-//         return cx.throw_error("Error: Lightclient is not initialized")
-//     }
-// }
-
-fn get_seed(mut cx: FunctionContext) -> JsResult<JsString> {
+#[node_bindgen]
+fn get_seed() -> Result<String, String> {
     if let Some(lightclient) = &*LIGHTCLIENT.read().unwrap() {
         RT.block_on(async move {
-            let seed = match lightclient.wallet.read().await.recovery_info() {
-                Some(recovery_info) => serde_json::to_string_pretty(&recovery_info)
-                    .unwrap_or_else(|_| "error: get seed. failed to serialize".to_string()),
-                None => "error: get seed. no mnemonic found. wallet loaded from key.".to_string(),
-            };
-            Ok(cx.string(seed))
+            match lightclient.wallet.read().await.recovery_info() {
+                Some(recovery_info) => Ok(serde_json::to_string_pretty(&recovery_info)
+                    .unwrap_or_else(|_| "error: get seed. failed to serialize".to_string())),
+                None => return Err("error: get seed. no mnemonic found. wallet loaded from key.".to_string()),
+            }
         })
     } else {
-        return cx.throw_error("Error: Lightclient is not initialized")
+        return Err("Error: Lightclient is not initialized".to_string())
     }
 }
 
-fn get_ufvk(mut cx: FunctionContext) -> JsResult<JsString> {
+#[node_bindgen]
+fn get_ufvk() -> Result<String, String> {
     if let Some(lightclient) = &*LIGHTCLIENT.read().unwrap() {
         RT.block_on(async move {
             let wallet = lightclient.wallet.read().await;
@@ -687,29 +627,27 @@ fn get_ufvk(mut cx: FunctionContext) -> JsResult<JsString> {
             {
                 Ok(ufvk) => ufvk,
                 Err(e) => {
-                    return cx.throw_error(format!("Error: {e}"));
+                    return Err(format!("Error: {e}"));
                 }
             };
-            Ok(cx.string(json::object! {
+            Ok(json::object! {
                 "ufvk" => ufvk.encode(&wallet.network),
                 "birthday" => u32::from(wallet.birthday)
             }
-            .pretty(2)))
+            .pretty(2))
         })
     } else {
-        return cx.throw_error("Error: Lightclient is not initialized")
+        return Err("Error: Lightclient is not initialized".to_string())
     }
 }
 
-fn send(mut cx: FunctionContext) -> JsResult<JsPromise> {
-    let send_json = cx.argument::<JsString>(0)?.value(&mut cx);
-    
+#[node_bindgen]
+async fn send(send_json: String) -> Result<String, String> {    
     let json_args = match json::parse(&send_json) {
         Ok(parsed) => parsed,
-        Err(_) => return cx.throw_error("Error: it is not a valid JSON")
+        Err(_) => return Err("Error: it is not a valid JSON".to_string())
     };
 
-    let promise = cx.task(move || {
         if let Some(lightclient) = &mut *LIGHTCLIENT.write().unwrap() {
             RT.block_on(async move {
                 let mut receivers = Receivers::new();
@@ -768,17 +706,10 @@ fn send(mut cx: FunctionContext) -> JsResult<JsPromise> {
         } else {
             Err("Error: Lightclient is not initialized".to_string())
         }            
-    }).promise(|mut cx, resp| {
-        match resp {
-            Ok(txids) => Ok(cx.string(txids)),
-            Err(e) => return cx.throw_error(format!("{e}")),
-        }
-    });
-
-    Ok(promise)
 }
 
-fn confirm(mut cx: FunctionContext) -> JsResult<JsString> {
+#[node_bindgen]
+fn confirm() -> Result<String, String> {
     if let Some(lightclient) = &mut *LIGHTCLIENT.write().unwrap() {
         RT.block_on(async move {
             match lightclient
@@ -786,18 +717,19 @@ fn confirm(mut cx: FunctionContext) -> JsResult<JsString> {
                 .await 
             {
                 Ok(txids) => {
-                    Ok(cx.string(json::object! { "txids" => txids.iter().map(|txid| txid.to_string()).collect::<Vec<_>>() }.pretty(2)))
+                    Ok(json::object! { "txids" => txids.iter().map(|txid| txid.to_string()).collect::<Vec<_>>() }.pretty(2))
                 }
                 Err(e) => {
-                    cx.throw_error(json::object! { "error" => e.to_string() }.pretty(2))
+                    return Err(json::object! { "error" => e.to_string() }.pretty(2))
                 }
             }
         })        
     } else {
-        return cx.throw_error("Error: Lightclient is not initialized")
+        return Err("Error: Lightclient is not initialized".to_string())
     }
 }
 
+// #[node_bindgen]
 // fn quick_send(mut cx: FunctionContext) -> JsResult<JsPromise> {
 //     let send_json = cx.argument::<JsString>(0)?.value(&mut cx);
     
@@ -867,22 +799,24 @@ fn confirm(mut cx: FunctionContext) -> JsResult<JsString> {
 //     Ok(promise)
 // }
 
-fn quick_shield(mut cx: FunctionContext) -> JsResult<JsString>{
+#[node_bindgen]
+fn quick_shield() -> Result<String, String>{
     if let Some(lightclient) = &mut *LIGHTCLIENT.write().unwrap() {
         RT.block_on(async move {
             match lightclient
                 .quick_shield(AccountId::ZERO)
                 .await {
-                    Ok(txids) => Ok(cx.string(json::object! { "txids" => txids.iter().map(|txid| txid.to_string()).collect::<Vec<_>>() }.pretty(2))),
-                    Err(e) => return cx.throw_error(format!("{}", json::object! { "error" => e.to_string() })),
+                    Ok(txids) => Ok(json::object! { "txids" => txids.iter().map(|txid| txid.to_string()).collect::<Vec<_>>() }.pretty(2)),
+                    Err(e) => return Err(format!("{}", json::object! { "error" => e.to_string() })),
                 }
         })        
     } else {
-        return cx.throw_error("Error: Lightclient is not initialized")
+        return Err("Error: Lightclient is not initialized".to_string())
     }
 }
 
-fn set_crypto_default_provider_to_ring(mut cx: FunctionContext) -> JsResult<JsString> {
+#[node_bindgen]
+fn set_crypto_default_provider_to_ring() -> Result<String, String> {
     let resp: String;
     {
         if CryptoProvider::get_default().is_none() {
@@ -898,32 +832,5 @@ fn set_crypto_default_provider_to_ring(mut cx: FunctionContext) -> JsResult<JsSt
         };
     }
 
-    Ok(cx.string(resp))
+    Ok(resp)
 }
-
-// fn decode_ua(mut cx: FunctionContext) -> JsResult<JsObject> {
-//     // Retrieve the Unified Address from the first argument
-//     let ua = cx.argument::<JsString>(0)?.value(&mut cx);
-
-//     // Attempt to decode the Unified Address
-//     let ua_full = match UnifiedAddress::decode(&MainNetwork, &ua) {
-//         Ok(u) => u,
-//         Err(err) => return cx.throw_error(format!("Failed to decode Unified Address: {}", err)),
-//     };
-
-//     // Extract Sapling address, if it exists
-//     let sapling_str: Option<String> = ua_full
-//         .sapling()
-//         .map(|addr| encode_payment_address(HRP_SAPLING_PAYMENT_ADDRESS, &addr));
-
-//     // Create Neon strings for the output
-//     let ua_neon = cx.string(&ua);
-//     let sapling_neon = cx.string(sapling_str.unwrap_or_else(|| "null".to_string()));
-
-//     // Construct the result object
-//     let obj = cx.empty_object();
-//     obj.set(&mut cx, "ua", ua_neon)?;
-//     obj.set(&mut cx, "sapling", sapling_neon)?;
-
-//     Ok(obj)
-// }

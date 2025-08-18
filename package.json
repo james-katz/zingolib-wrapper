@@ -5,10 +5,6 @@
   "author": "James Katz",
   "license": "MIT",
   "scripts": {
-    "neon": "cargo-cp-artifact -nc native.node -- cargo build --release --manifest-path native/Cargo.toml --message-format=json-render-diagnostics",
-    "build": "npm run neon"
-  },
-  "devDependencies": {
-    "cargo-cp-artifact": "^0.1.9"
+    "build": "cd native && nj-cli build --release"
   }
 }

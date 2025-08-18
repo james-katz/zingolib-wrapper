@@ -1,4 +1,4 @@
-const native = require('./native.node');
+const native = require('./native/dist');
 
 class ZingoLib {
     constructor(uri, chain) {
@@ -15,12 +15,12 @@ class ZingoLib {
 
     async init() {
         return new Promise(async (resolve, reject) => {            
-            if(!native.zingolib_set_crypto_default_provider_to_ring()) {
+            if(!native.setCryptoDefaultProviderToRing()) {
                 reject("Error initializing crypto provider.")
             };
-            if (native.zingolib_wallet_exists(this.serveruri, this.chain)) {
+            if (native.walletExists(this.serveruri, this.chain)) {
                 try {
-                    const wallet = native.zingolib_init_from_disk(this.serveruri, this.chain);
+                    const wallet = native.initFromDisk(this.serveruri, this.chain);
                     if (wallet && !wallet.toLowerCase().startsWith('error')) {
                         console.log(wallet);
                     }
@@ -33,7 +33,7 @@ class ZingoLib {
             else {
                 console.log("No wallet configured, creating a new one from fresh entropy..");
                 try {
-                    const res = native.zingolib_init_new(this.serveruri, this.chain);
+                    const res = native.initNew(this.serveruri, this.chain);
                     const seed = await this.getWalletSeed();
                     console.log(`${res}\nPlease save this recovery info:`, seed);
                 }
@@ -49,12 +49,12 @@ class ZingoLib {
 
     restore(seed, birthday) {
         return new Promise((resolve, reject) => {
-            if(!native.zingolib_set_crypto_default_provider_to_ring()) {
+            if(!native.setCryptoDefaultProviderToRing()) {
                 reject("Error initializing crypto provider.")
             };
             if(seed) {            
                 console.log("Trying to initialize wallet from seed ...")
-                const res = native.zingolib_init_from_seed_phrase(this.serveruri, seed, birthday, this.chain);
+                const res = native.initFromSeedPhrase(this.serveruri, seed, birthday, this.chain);
                 if(!res.toLowerCase().startsWith('error')) {
                     // const seedJson = JSON.parse(res);
                     console.log(`Seed imported, will sync from height ${birthday}`);
@@ -70,12 +70,12 @@ class ZingoLib {
 
     from_ufvk(ufvk, birthday) {
         return new Promise((resolve, reject) => {
-            if(!native.zingolib_set_crypto_default_provider_to_ring()) {
+            if(!native.setCryptoDefaultProviderToRing()) {
                 reject("Error initializing crypto provider.")
             };
             if(ufvk) {            
                 console.log("Trying to initialize wallet from ufvk (watch only) ...")
-                const res = native.zingolib_init_from_ufvk(this.serveruri, ufvk, birthday, this.chain);
+                const res = native.initFromUfvk(this.serveruri, ufvk, birthday, this.chain);
                 if(!res.toLowerCase().startsWith('error')) {
                     const ufvkRes = res;
                     console.log(`ufvk imported, will sync from height ${birthday}`);
@@ -100,7 +100,7 @@ class ZingoLib {
             this.fetchServerHeight();
             this.fetchWalletHeight();
 
-            // const task = native.zingolib_save_wallet_task();
+            // const task = native.saveWalletTask();
             // console.log(task);
 
             // Do initial sync
@@ -124,7 +124,7 @@ class ZingoLib {
 
     pauseSyncProcess() {
         try {
-            const res = native.zingolib_pause_sync();
+            const res = native.pauseSync();
             console.log(res);
         }
         catch(err) {
@@ -134,7 +134,7 @@ class ZingoLib {
 
     stopSyncProcess() {
         try {
-            const res = native.zingolib_stop_sync();
+            const res = native.stopSync();
             console.log(res);
         }
         catch(err) {
@@ -144,7 +144,7 @@ class ZingoLib {
 
     doSaveWallet() {
         try {
-            const res = native.zingolib_save_wallet();
+            const res = native.saveWallet();
             console.log(res)
         } catch (error) {
             console.log(`Critical Error save wallet ${error}`);
@@ -153,7 +153,7 @@ class ZingoLib {
     
     doSyncStatus() {
         try {
-            const syncStatusStr = native.zingolib_status_sync();
+            const syncStatusStr = native.statusSync();
             if (syncStatusStr) {
                 if (syncStatusStr.toLowerCase().startsWith('error')) {
                     console.log(`Error sync status ${syncStatusStr}`);
@@ -173,7 +173,7 @@ class ZingoLib {
 
     doSyncPoll() {
         try {
-            const syncPollStr = native.zingolib_poll_sync();
+            const syncPollStr = native.pollSync();
             if (syncPollStr) {
                 if (syncPollStr.toLowerCase().startsWith('error')) {
                     console.log(`Error sync poll ${syncPollStr}`);
@@ -212,7 +212,7 @@ class ZingoLib {
             console.log(`Refresing wallet: ${this.lastServerBlockHeight - this.lastWalletBlockHeight} new blocks.`);
 
             try {
-                let res = native.zingolib_run_sync();
+                let res = native.runSync();
                 if(res) {
                     console.log(res)
                     if(res.toLowerCase().startsWith("error")) {
@@ -283,7 +283,7 @@ class ZingoLib {
     doRescan() {
         console.log("Triggering a wallet rescan ...");
         try {
-            const res = native.zingolib_run_rescan();        
+            const res = native.runRescan();        
             if(res) {
                 console.log(res);
             }
@@ -301,7 +301,7 @@ class ZingoLib {
 
     fetchServerHeight() {
         try {
-            const heightStr = native.zingolib_get_latest_block_server(this.serveruri);
+            const heightStr = native.getLatestBlockServer(this.serveruri);
             if (heightStr) {
                 if (heightStr.toLowerCase().startsWith('error')) {
                     console.log(`Error server height ${heightStr}`);
@@ -324,9 +324,10 @@ class ZingoLib {
 
     fetchWalletHeight() {
         try {
-            const heightStr = native.zingolib_get_latest_block_wallet();
+            const heightStr = native.getLatestBlockWallet();
             if (heightStr) {                    
-                this.lastWalletBlockHeight = heightStr.height;
+                const heightJson = JSON.parse(heightStr);
+                this.lastWalletBlockHeight = heightJson.height;
             }
             else {
                 throw("Internal Error wallet height");
@@ -342,7 +343,7 @@ class ZingoLib {
 
     fetchTotalSpendableBalance() {
         try {
-            // const bal = native.zingolib_get_spendable_balance_total();
+            // const bal = native.getSpendableBalanceTotal();
             const bal = this.fetchWalletBalance();
             if (bal) {                                    
                 return (bal.confirmed_orchard_balance + bal.confirmed_sapling_balance) / 10 ** 8;
@@ -360,9 +361,13 @@ class ZingoLib {
 
     fetchWalletBalance() {
         try {
-            const bal = native.zingolib_get_balance();
+            const bal = native.getBalance();
             if (bal) {                    
-                return bal;
+                if(bal.toLowerCase().startsWith("error")) {
+                    throw("Internal Error wallet balance");
+                }
+                const balJson = JSON.parse(bal);
+                return balJson;
             }
             else {
                 throw("Internal Error wallet balance");
@@ -376,7 +381,7 @@ class ZingoLib {
 
     fetchNotes() {
         try {
-            const notesStr = native.zingolib_get_notes(false);
+            const notesStr = native.getNotes(false);
             if (notesStr) {
                 if (notesStr.toLowerCase().startsWith('error')) {
                     throw(`Error wallet notes ${notesStr}`);                    
@@ -395,7 +400,7 @@ class ZingoLib {
 
     fetchAllAddresses() {
         try {
-            const addrStr = native.zingolib_get_unified_addresses();
+            const addrStr = native.getUnifiedAddresses();
             
             if (addrStr) {
                 if (addrStr.toLowerCase().startsWith('error')) {
@@ -478,7 +483,7 @@ class ZingoLib {
     shieldTransparent() {
         console.log('Trying to shield transparent funds ...')
         try {
-            const resStr = native.zingolib_quick_shield();
+            const resStr = native.quickShield();
             const resJson = JSON.parse(resStr);
             if(resJson.error) {
                 throw(`Internal Error shielding: ${resJson.error}`);
@@ -494,9 +499,9 @@ class ZingoLib {
 
     async sendTransaction(sendJson) {
         return new Promise((resolve, reject) => {
-            native.zingolib_send(sendJson).then(fee => {
+            native.send(sendJson).then(fee => {
                 console.log(fee);
-                const txid = native.zingolib_confirm();
+                const txid = native.confirm();
                 resolve(txid);
             }).catch((err) => { 
                 console.log(err);
@@ -505,100 +510,6 @@ class ZingoLib {
         });
     }
 
-    // async sendTransaction(sendJson) {
-    //      // First, get the previous send progress id, so we know which ID to track
-    //     const prevProgressStr = await native.zingolib_execute_async("sendprogress", "");
-    //     const prevProgressJSON = JSON.parse(prevProgressStr);
-    //     const prevSendId = prevProgressJSON.id;
-    //     let sendTxids = '';
-    //     let sendTxid = '';
-        
-    //     this.isSending = true;
-
-    //     // Propose a tx
-    //     try {
-    //         console.log(`Sending ${JSON.stringify(sendJson)}`);
-    //         const resp = await native.zingolib_execute_async("send", JSON.stringify(sendJson));            
-    //         console.log(`End Sending, response: ${resp}`); 
-    //     } 
-    //     catch(err) {
-    //         console.log(`Error sending Tx: ${err}`);
-    //         throw err;
-    //     }
-
-    //     // Confirm the tx ...
-    //     try {
-    //         console.log('Confirming');
-    //         const resp = await native.zingolib_execute_async("confirm", "");
-    //         console.log(`End Confirming, response: ${resp}`);
-    //         if (resp.toLowerCase().startsWith('error')) {
-    //             console.log(`Error confirming Tx: ${resp}`);
-    //             throw Error(resp);  
-    //         } 
-    //         else {
-    //             const respJSON = JSON.parse(resp);
-    //             if (respJSON.error) {
-    //                 console.log(`Error confirming Tx: ${respJSON.error}`);
-    //                 throw Error(respJSON.error);
-    //             } 
-    //             else if (respJSON.txids) {                    
-    //                 sendTxids = respJSON.txids.join(', ');
-    //                 sendTxid = respJSON.txids[0];
-    //             } 
-    //             else {
-    //                 console.log(`Error confirming: no error, no txids `);
-    //                 this.isSending = false;
-    //                 throw Error('Error confirming: no error, no txids');
-    //             }
-    //         }
-    //     } catch (err) {
-    //         console.log(`Error confirming Tx: ${err}`);
-    //         this.isSending = false;
-    //         throw err;
-    //     }
-        
-    //     // Return the promise, resolve with txid
-    //     return new Promise((resolve, reject) => {
-    //         const intervalID = setInterval(async () => {
-    //             const progressStr = await native.zingolib_execute_async("sendprogress", "");
-    //             const progressJSON = JSON.parse(progressStr);
-
-    //             if (progressJSON.id === prevSendId  && !sendTxids) {
-    //                 // Still not started, so wait for more time
-    //                 return;
-    //             }
-
-    //             if (!progressJSON.txids && !progressJSON.error && !sendTxids) {
-    //                 // Still processing
-    //                 return;
-    //             }
-
-    //             // Finished processing
-    //             clearInterval(intervalID);
-    //             this.isSending = false;
-    //             if (progressJSON.txids) {
-    //                 // And refresh data (full refresh)
-    //                 this.doRefresh(true);
-            
-    //                 resolve(progressJSON.txids[0]);
-    //             }
-        
-    //             if (progressJSON.error) {
-    //                 reject(progressJSON.error);
-    //             }
-
-    //             if (sendTxids) {
-    //                 // And refresh data (full refresh)
-    //                 this.doRefresh(true);
-          
-    //                 resolve(sendTxid);
-    //               }
-
-    //         }, 2 * 1000); // Every two seconds
-
-    //     });
-    // }
-
     async getTransactions() {
          const txns = await this.getTransactionsPromise();
          return txns;
@@ -606,7 +517,7 @@ class ZingoLib {
 
     getTransactionsPromise() {
         return new Promise((resolve, reject) => {
-            native.zingolib_get_value_transfers().then((txnsStr) => {
+            native.getValueTransfersAsync().then((txnsStr) => {
                 if (txnsStr) {
                     if (txnsStr.toLowerCase().startsWith('error')) {
                         console.log(`Error wallet transactions ${txnsStr}`);
@@ -628,8 +539,6 @@ class ZingoLib {
     async fetchLastTxId() {        
         const txListJson = await this.getTransactions();
         
-        // const txListJson = JSON.parse(txList);
-
         if(txListJson && txListJson.value_transfers.length > 0) {
             return txListJson.value_transfers[0].txid;
         }
@@ -638,7 +547,7 @@ class ZingoLib {
 
     getWalletSeed() {
         try {
-            const seedStr = native.zingolib_get_seed();
+            const seedStr = native.getSeed();
             if(seedStr) {
                 const seedJson = JSON.parse(seedStr);
                 return seedJson;
@@ -652,7 +561,7 @@ class ZingoLib {
 
     getWalletUfvk() {
         try {
-            const ufvkStr = native.zingolib_get_ufvk();
+            const ufvkStr = native.getUfvk();
             if(ufvkStr) {
                 const ufvkJson = JSON.parse(ufvkStr);
                 return ufvkJson;
@@ -666,7 +575,7 @@ class ZingoLib {
 
     parseAddress(addr) {
         try {
-            const addrStr = native.zingolib_parse_address(addr);
+            const addrStr = native.parseAddress(addr);
             if (addrStr) {
                 const addrJson = JSON.parse(addrStr);
                 return addrJson;               
@@ -680,20 +589,9 @@ class ZingoLib {
         }
     }
 
-    // decodeAddress(addr) {
-    //     try {
-    //         let res = native.zingolib_decode_ua(addr);
-    //         return res;
-    //     }
-    //     catch(err) {
-    //         // console.log(err);
-    //         return;
-    //     }
-    // }
-
     async createNewAddress() {
         try {
-            const addrStr = native.zingolib_create_new_unified_address('oz');
+            const addrStr = native.createNewUnifiedAddress('oz');
             if (addrStr.toLowerCase().startsWith('error')) {
                 throw(`Error creating address ${addrStr}`);
             }
@@ -710,7 +608,6 @@ class ZingoLib {
         console.log("Safely shutting down zingolib ... ");
         // this.stopSyncProcess();
         this.doSaveWallet();
-        // await native.zingolib_execute_async('quit', '');
         process.exit();
     }   
 }
