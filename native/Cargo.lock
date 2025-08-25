@@ -3999,7 +3999,6 @@ dependencies = [
 [[package]]
 name = "pepper-sync"
 version = "0.0.1"
-source = "git+https://github.com/zingolabs/zingolib?tag=2.0.2#776830b4ff8b9a9d39ba9559aa5681c25dc03478"
 dependencies = [
  "bip32",
  "byteorder",
@@ -8085,9 +8084,9 @@ dependencies = [
 
 [[package]]
 name = "zcash_client_backend"
-version = "0.18.0"
+version = "0.18.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "17d9eb503faa9f72a1b6575f884e524ac43e816b275a28445e9ecb9c59e46771"
+checksum = "568427bc188e401ece5524a66a6818ddb8f1b16bb518bafec7b83ca041adc5f9"
 dependencies = [
  "arti-client",
  "base64",
@@ -8673,7 +8672,6 @@ dependencies = [
 [[package]]
 name = "zingo-memo"
 version = "0.0.1"
-source = "git+https://github.com/zingolabs/zingolib?tag=2.0.2#776830b4ff8b9a9d39ba9559aa5681c25dc03478"
 dependencies = [
  "zcash_address",
  "zcash_client_backend",
@@ -8685,7 +8683,6 @@ dependencies = [
 [[package]]
 name = "zingo-netutils"
 version = "0.0.1"
-source = "git+https://github.com/zingolabs/zingolib?tag=2.0.2#776830b4ff8b9a9d39ba9559aa5681c25dc03478"
 dependencies = [
  "http",
  "http-body",
@@ -8705,7 +8702,6 @@ dependencies = [
 [[package]]
 name = "zingo-price"
 version = "0.0.1"
-source = "git+https://github.com/zingolabs/zingolib?tag=2.0.2#776830b4ff8b9a9d39ba9559aa5681c25dc03478"
 dependencies = [
  "byteorder",
  "reqwest",
@@ -8721,7 +8717,6 @@ dependencies = [
 [[package]]
 name = "zingo-status"
 version = "0.0.1"
-source = "git+https://github.com/zingolabs/zingolib?tag=2.0.2#776830b4ff8b9a9d39ba9559aa5681c25dc03478"
 dependencies = [
  "byteorder",
  "zcash_primitives",
@@ -8730,7 +8725,6 @@ dependencies = [
 [[package]]
 name = "zingolib"
 version = "0.0.1"
-source = "git+https://github.com/zingolabs/zingolib?tag=2.0.2#776830b4ff8b9a9d39ba9559aa5681c25dc03478"
 dependencies = [
  "append-only-vec",
  "bech32",

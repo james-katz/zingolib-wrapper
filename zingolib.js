@@ -7,6 +7,7 @@ class ZingoLib {
 
         this.syncInterval;
         this.syncStatusInterval;
+        this.syncLock = false;
         this.lastWalletBlockHeight;
         this.lastServerBlockHeight;
         this.inRefresh = false;
@@ -202,6 +203,11 @@ class ZingoLib {
             return;
         }
 
+        if(this.syncLock) {
+            console.log("Wallet is busy, will sync after heavy operation is done.");
+            return;
+        }
+
         // await this.fetchWalletHeight();
         this.fetchServerHeight();
 
@@ -343,11 +349,11 @@ class ZingoLib {
 
     fetchTotalSpendableBalance() {
         try {
-            // const bal = native.getSpendableBalanceTotal();
-            const bal = this.fetchWalletBalance();
+            const bal = native.getSpendableBalanceTotal();
+            // const bal = this.fetchWalletBalance();
             if (bal) {                                    
-                return (bal.confirmed_orchard_balance + bal.confirmed_sapling_balance) / 10 ** 8;
-                // return bal;
+                // return (bal.confirmed_orchard_balance + bal.confirmed_sapling_balance) / 10 ** 8;
+                return bal;
             }
             else {
                 throw("Internal Error wallet balance");
@@ -510,12 +516,35 @@ class ZingoLib {
         });
     }
 
+    resendTransaction(txid) {
+        try {
+            const res = native.resendTransaction(txid);
+            console.log(res);
+            this.doSaveWallet();
+        }
+        catch(err) {
+            console.log(`Resend transaction error: ${err}`);            
+        }
+    }
+
+    removeTransaction(txid) {
+        try {
+            const res = native.removeTransaction(txid);            
+            console.log(res);
+            this.doSaveWallet();
+        }
+        catch(err) {
+            console.log(`Remove transaction error: ${err}`);            
+        }
+    }
+
     async getTransactions() {
          const txns = await this.getTransactionsPromise();
          return txns;
     }
 
     getTransactionsPromise() {
+        this.syncLock = true;
         return new Promise((resolve, reject) => {
             native.getValueTransfersAsync().then((txnsStr) => {
                 if (txnsStr) {
@@ -528,21 +557,31 @@ class ZingoLib {
                     throw("Internal Error wallet transactions");
                 }
                 const txnsJSON = JSON.parse(txnsStr);
+                this.syncLock = false;
                 resolve(txnsJSON);
             }).catch((error) => {
                 // console.log(`Critical Error wallet transactions ${error}`);
+                this.syncLock = false;
                 reject(error);
             });
         });        
     }
 
-    async fetchLastTxId() {        
-        const txListJson = await this.getTransactions();
+    fetchLastTxId() {        
+        try {
+            const txid = native.lastTxid();
         
-        if(txListJson && txListJson.value_transfers.length > 0) {
-            return txListJson.value_transfers[0].txid;
+            if(txid && !txid.toLowerCase().startsWith('error')) {
+                return txid;
+            }
+            else {
+                throw(txid);                
+            }
         }
-        else return -1;
+        catch(err) {
+            console.log(`Last txid error: ${err}`);
+            return -1;
+        }
     }
 
     getWalletSeed() {

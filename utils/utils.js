@@ -37,6 +37,8 @@ class TxBuilder {
     getSendJSON() {                  
         let sendJSON = [];
 
+        if(this.recipient.toLowerCase().startsWith('t')) this.memo = "";
+
         if(this.memo.length <= 512) {
             if(this.memo === "") this.memo = undefined;
             sendJSON = [{

@@ -8,7 +8,7 @@ use lazy_static::lazy_static;
 use tokio::runtime::Runtime;
 use zcash_address::ZcashAddress;
 use zcash_protocol::{memo::MemoBytes, value::Zatoshis};
-use zingolib::{config::{construct_lightwalletd_uri, ChainType, ZingoConfig}, data::{proposal::total_fee, receivers::{transaction_request_from_receivers, Receivers}, PollReport}, wallet::{keys::unified::ReceiverSelection, LightWallet, WalletBase, WalletSettings}};
+use zingolib::{config::{construct_lightwalletd_uri, ChainType, ZingoConfig}, data::{proposal::total_fee, receivers::{transaction_request_from_receivers, Receivers}, PollReport}, utils::conversion::txid_from_hex_encoded_str, wallet::{keys::unified::ReceiverSelection, LightWallet, WalletBase, WalletSettings}};
 use zingolib::lightclient::LightClient;
 use zingo_infra_services::network::ActivationHeights;
 
@@ -302,13 +302,30 @@ fn get_latest_block_server(server_uri: String) -> Result<String, String> {
 
 #[node_bindgen]
 fn get_latest_block_wallet() -> Result<String, String> {
-    if let Some(lightclient) = &*LIGHTCLIENT.write().unwrap() {
+    if let Some(lightclient) = &*LIGHTCLIENT.read().unwrap() {
         let height = RT.block_on(async move {
             lightclient.wallet.read().await.sync_state.fully_scanned_height().map(u32::from).unwrap_or(0)
         });
         Ok(json::object! {"height" => height}.pretty(2))
     } else {
         return Err("Error: Lightclient is not initialized".to_string());
+    }
+}
+
+#[node_bindgen]
+fn last_txid() -> String {
+if let Some(lightclient) = &*LIGHTCLIENT.read().unwrap() {
+        RT.block_on(async move {
+            let wallet = lightclient.wallet.read().await;
+            match wallet.wallet_transactions
+                .iter()
+                .max_by_key(|(_, tx)| tx.datetime()) {
+                    Some((txid, _)) => format!("{txid}"),
+                    None => "Error: wallet_transactions is empty.".to_string(),
+                }
+        })        
+    } else {
+        return "Error: Lightclient is not initialized".to_string();
     }
 }
 
@@ -592,6 +609,12 @@ async fn get_value_transfers_async() -> Result<String, String> {
         lc.wallet.clone()
     };
 
+    // RT.block_on(async  {
+    //     println!("Sleeping");
+    //     tokio::time::sleep(std::time::Duration::from_secs(10)).await;
+    //     println!("Waking up");
+    // });
+    
     let wallet_guard = wallet.read().await;
     match wallet_guard.value_transfers(true).await {
         Ok(vt)  => Ok(json::JsonValue::from(vt).pretty(2)),
@@ -648,64 +671,64 @@ async fn send(send_json: String) -> Result<String, String> {
         Err(_) => return Err("Error: it is not a valid JSON".to_string())
     };
 
-        if let Some(lightclient) = &mut *LIGHTCLIENT.write().unwrap() {
-            RT.block_on(async move {
-                let mut receivers = Receivers::new();
-                for j in json_args.members() {
-                    let recipient_address = match j["address"].as_str() {
-                        Some(addr) => match ZcashAddress::try_from_encoded(addr) {
-                            Ok(a) => a,
-                            Err(e) => return Err(format!("Error: Invalid address: {e}")),
-                        },
-                        None => return Err("Error: Missing address".to_string()),
-                    };
-
-                    let amount = match j["amount"].as_u64() {
-                        Some(a) => match Zatoshis::from_u64(a) {
-                            Ok(a) => a,
-                            Err(e) => return Err(format!("Error: Invalid amount: {e}")),
-                        },
-                        None => return Err("Missing amount".to_string()),
-                    };
-
-                    let memo = if let Some(m) = j["memo"].as_str() {
-                        let memo_bytes = MemoBytes::from_bytes(&Vec::from(m.as_bytes()))
-                            .map_err(|_| format!("Error creating output. Memo '{:?}' is too long", m));
-                        Some(memo_bytes.unwrap())
-                    } else {
-                        None
-                    };
-
-                    receivers.push(zingolib::data::receivers::Receiver {
-                        recipient_address,
-                        amount,
-                        memo,
-                    });
-                }
-
-                let request = match transaction_request_from_receivers(receivers)
-                {
-                    Ok(request) => request,
-                    Err(e) => return Err(format!("Error: Request Error: {e}")),
+    if let Some(lightclient) = &mut *LIGHTCLIENT.write().unwrap() {
+        RT.block_on(async move {
+            let mut receivers = Receivers::new();
+            for j in json_args.members() {
+                let recipient_address = match j["address"].as_str() {
+                    Some(addr) => match ZcashAddress::try_from_encoded(addr) {
+                        Ok(a) => a,
+                        Err(e) => return Err(format!("Error: Invalid address: {e}")),
+                    },
+                    None => return Err("Error: Missing address".to_string()),
                 };
 
-                match lightclient
-                .propose_send(request, AccountId::ZERO).await {
-                    Ok(proposal) => {
-                        let fee = match total_fee(&proposal) {
-                            Ok(fee) => fee,
-                            Err(e) => return Err(json::object! { "error" => e.to_string() }.pretty(2)),
-                        };
-                        Ok(json::object! { "fee" => fee.into_u64() }.pretty(2))
-                    }
-                    Err(e) => {
-                        Err(json::object! { "error" => e.to_string() }.pretty(2))
-                    }
+                let amount = match j["amount"].as_u64() {
+                    Some(a) => match Zatoshis::from_u64(a) {
+                        Ok(a) => a,
+                        Err(e) => return Err(format!("Error: Invalid amount: {e}")),
+                    },
+                    None => return Err("Missing amount".to_string()),
+                };
+
+                let memo = if let Some(m) = j["memo"].as_str() {
+                    let memo_bytes = MemoBytes::from_bytes(&Vec::from(m.as_bytes()))
+                        .map_err(|_| format!("Error creating output. Memo '{:?}' is too long", m));
+                    Some(memo_bytes.unwrap())
+                } else {
+                    None
+                };
+
+                receivers.push(zingolib::data::receivers::Receiver {
+                    recipient_address,
+                    amount,
+                    memo,
+                });
+            }
+
+            let request = match transaction_request_from_receivers(receivers)
+            {
+                Ok(request) => request,
+                Err(e) => return Err(format!("Error: Request Error: {e}")),
+            };
+
+            match lightclient
+            .propose_send(request, AccountId::ZERO).await {
+                Ok(proposal) => {
+                    let fee = match total_fee(&proposal) {
+                        Ok(fee) => fee,
+                        Err(e) => return Err(json::object! { "error" => e.to_string() }.pretty(2)),
+                    };
+                    Ok(json::object! { "fee" => fee.into_u64() }.pretty(2))
                 }
-            })
-        } else {
-            Err("Error: Lightclient is not initialized".to_string())
-        }            
+                Err(e) => {
+                    Err(json::object! { "error" => e.to_string() }.pretty(2))
+                }
+            }
+        })
+    } else {
+        Err("Error: Lightclient is not initialized".to_string())
+    }            
 }
 
 #[node_bindgen]
@@ -812,6 +835,48 @@ fn quick_shield() -> Result<String, String>{
         })        
     } else {
         return Err("Error: Lightclient is not initialized".to_string())
+    }
+}
+
+#[node_bindgen]
+pub fn remove_transaction(txid: String) -> Result<String, String> {
+    if let Some(lightclient) = &mut *LIGHTCLIENT.write().unwrap() {
+        let txid = match txid_from_hex_encoded_str(&txid) {
+            Ok(txid) => txid,
+            Err(e) => return Err(format!("Error: {e}")),
+        };
+
+        RT.block_on(async move {
+            match lightclient
+                .wallet
+                .write()
+                .await
+                .remove_unconfirmed_transaction(txid) {
+                Ok(_) => Ok("Successfully removed transaction.".to_string()),
+                Err(e) => Err(format!("Error: {e}")),
+            }
+        })
+    } else {
+        Err("Error: Lightclient is not initialized".to_string())
+    }
+}
+
+#[node_bindgen]
+pub fn resend_transaction(txid: String) -> Result<String, String> {
+    if let Some(lightclient) = &mut *LIGHTCLIENT.write().unwrap() {
+        let txid = match txid_from_hex_encoded_str(&txid) {
+            Ok(txid) => txid,
+            Err(e) => return Err(format!("Error: {e}")),
+        };
+
+        RT.block_on(async move {
+            match lightclient.resend(txid).await {
+                Ok(_) => Ok("Successfully resent transaction.".to_string()),
+                Err(e) => Err(format!("Error: {e}")),
+            }
+        })
+    } else {
+        Err("Error: Lightclient is not initialized".to_string())
     }
 }
 

@@ -1,6 +1,7 @@
 const ZingoLib = require('./zingolib');
 
 const client = new ZingoLib("https://testnet.zec.rocks:443", "test");
+let start;
 
 client.init().then(async (res)=> {
     console.log(res);
@@ -37,12 +38,12 @@ client.init().then(async (res)=> {
     // console.log(addr);
 
     // Get notes
-    // const notes = client.fetchNotes();    
-    // console.log(notes)
+    //const notes = client.fetchNotes();    
+    //console.log(notes.orchard_notes.note_summaries[0])
     
     // Get last txid
-     const txid = await client.fetchLastTxId();
-     console.log(txid);
+    const txid = client.fetchLastTxId();
+    console.log(txid);
 
     // Get last transaction details (uncomment previous txid line)
     // const tx = await client.getTransactions();    
@@ -53,21 +54,27 @@ client.init().then(async (res)=> {
     // console.log(txAddrVal)
      
     //Get all transactions
-    
-    client.getTransactionsPromise().then(txns => {
-        // console.log(txns);
-        
-        // And filter recevied tx only (uncomment previous txns line)
-        const r = txns.value_transfers.filter((t) => t.kind == 'sent');
-        let txCount = 0;
-        for(const rx of r) {
-            console.log(rx);
-            txCount ++;
-            if(txCount >= 1) break;
-        }
-    });
-    
    
+    client.getTransactionsPromise().then(txns => {
+      // console.log(txns);
+      
+      // And filter by tx kind (uncomment previous txns line)
+      const r = txns.value_transfers.filter((t) => t.kind == 'sent');
+      
+      // Remove uncofnirmed transactionns (tx kind must be "sennt")
+      // const unconfirmed = r.filter((t) => t.status == 'calculated');
+      // for(const tx of unconfirmed) {
+      //   client.removeTransaction(tx.txid);
+      // }
+
+      let txCount = 0;
+      for(const rx of r) {
+          console.log(rx);
+          txCount ++;
+          if(txCount >= 3) break;
+      }      
+    });
+
     // Get the wallet seed
     // const seed = await client.getWalletSeed();
     // console.log(seed);
@@ -81,3 +88,14 @@ client.init().then(async (res)=> {
     // client.deinitialize();
   
 }).catch((err) => {console.log(err)});
+
+function startTimer() {
+  start = process.hrtime.bigint();
+}
+
+function endTimer() {
+  const end = process.hrtime.bigint();
+  const durationMs = Number(end - start) / 1_000_000_000; // ns → s
+  console.log(`Elapsed time: ${durationMs.toFixed(3)} s`);
+  return durationMs;
+}
