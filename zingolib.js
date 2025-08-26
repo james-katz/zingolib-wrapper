@@ -356,7 +356,7 @@ class ZingoLib {
                 return bal;
             }
             else {
-                throw("Internal Error wallet balance");
+                throw(`Internal Error wallet balance ${bal}`);
             }
         }
         catch(err) {
