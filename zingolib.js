@@ -10,6 +10,7 @@ class ZingoLib {
         this.syncLock = false;
         this.lastWalletBlockHeight;
         this.lastServerBlockHeight;
+        this.totalSpendableBalance = 0;
         this.inRefresh = false;
         this.isSending = false;
     }
@@ -348,11 +349,14 @@ class ZingoLib {
     }   
 
     fetchTotalSpendableBalance() {
+        if(this.inRefresh || this.isSending) return this.totalSpendableBalance;
+
         try {
             const bal = native.getSpendableBalanceTotal();
             // const bal = this.fetchWalletBalance();
-            if (bal) {                                    
+            if (bal) {
                 // return (bal.confirmed_orchard_balance + bal.confirmed_sapling_balance) / 10 ** 8;
+                this.totalSpendableBalance = bal;
                 return bal;
             }
             else {
