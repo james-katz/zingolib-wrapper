@@ -8,9 +8,8 @@ use lazy_static::lazy_static;
 use tokio::runtime::Runtime;
 use zcash_address::ZcashAddress;
 use zcash_protocol::{memo::MemoBytes, value::Zatoshis};
-use zingolib::{config::{construct_lightwalletd_uri, ChainType, ZingoConfig}, data::{proposal::total_fee, receivers::{transaction_request_from_receivers, Receivers}, PollReport}, utils::conversion::txid_from_hex_encoded_str, wallet::{keys::unified::ReceiverSelection, LightWallet, WalletBase, WalletSettings}};
+use zingolib::{config::{construct_lightwalletd_uri, ChainType, ZingoConfig}, data::{proposal::total_fee, receivers::{transaction_request_from_receivers, Receivers}, PollReport}, testutils, utils::conversion::txid_from_hex_encoded_str, wallet::{keys::unified::ReceiverSelection, LightWallet, WalletBase, WalletSettings}};
 use zingolib::lightclient::LightClient;
-use zingo_infra_services::network::ActivationHeights;
 
 use std::{fs::File, io::Write, sync::RwLock};
 
@@ -37,41 +36,6 @@ fn store_client(lightclient: LightClient) {
     LIGHTCLIENT.write().unwrap().replace(lightclient);
 }
 
-// #[neon::main]
-// fn main(mut cx: ModuleContext) -> NeonResult<()> {
-//     cx.export_function("sayHello", say_hello)?;
-//     cx.export_function("zingolib_wallet_exists", wallet_exists)?;
-//     cx.export_function("zingolib_init_new", init_new)?;
-//     cx.export_function("zingolib_init_from_seed_phrase", init_from_seed_phrase)?;
-//     cx.export_function("zingolib_init_from_ufvk", init_from_ufvk)?;
-//     cx.export_function("zingolib_init_from_disk", init_from_disk)?;
-//     cx.export_function("zingolib_save_wallet", save_wallet)?;
-//     cx.export_function("zingolib_save_wallet_task", save_wallet_task)?;
-//     cx.export_function("zingolib_get_latest_block_server", get_latest_block_server)?;
-//     cx.export_function("zingolib_get_latest_block_wallet", get_latest_block_wallet)?;
-//     cx.export_function("zingolib_get_notes", get_notes)?;
-//     cx.export_function("zingolib_get_balance", get_balance)?;
-//     cx.export_function("zingolib_get_spendable_balance_total", get_spendable_balance_total)?;
-//     cx.export_function("zingolib_get_unified_addresses", get_unified_addresses)?;
-//     cx.export_function("zingolib_create_new_unified_address", create_new_unified_address)?;
-//     cx.export_function("zingolib_parse_address", parse_address)?;
-//     cx.export_function("zingolib_run_rescan", run_rescan)?;
-//     cx.export_function("zingolib_run_sync", run_sync)?;
-//     cx.export_function("zingolib_pause_sync", pause_sync)?;
-//     cx.export_function("zingolib_stop_sync", stop_sync)?;
-//     cx.export_function("zingolib_status_sync", status_sync)?;
-//     cx.export_function("zingolib_poll_sync", poll_sync)?;
-//     cx.export_function("zingolib_get_value_transfers", get_value_transfers)?;
-//     cx.export_function("zingolib_get_seed", get_seed)?;
-//     cx.export_function("zingolib_get_ufvk", get_ufvk)?;
-//     cx.export_function("zingolib_send", send)?;
-//     cx.export_function("zingolib_confirm", confirm)?;
-//     cx.export_function("zingolib_quick_shield", quick_shield)?;    
-//     cx.export_function("zingolib_set_crypto_default_provider_to_ring", set_crypto_default_provider_to_ring)?;
-    
-//     Ok(())
-// }
-
 #[node_bindgen]
 fn say_hello() -> String {
     "Hello from Rust!".to_string()
@@ -86,7 +50,7 @@ fn construct_uri_load_config(
     let chaintype = match chain_hint.as_str() {
         "main" => ChainType::Mainnet,
         "test" => ChainType::Testnet,
-        "regtest" => ChainType::Regtest(ActivationHeights::default()),
+        "regtest" => ChainType::Regtest(testutils::default_regtest_heights()),
         _ => return Err("Error: Not a valid chain hint!".to_string()),
     };
     let config = match zingolib::config::load_clientconfig(
@@ -439,7 +403,7 @@ fn parse_address(address: String) -> Result<String, String> {
             [
                 ChainType::Mainnet,
                 ChainType::Testnet,
-                ChainType::Regtest(ActivationHeights::default()),
+                ChainType::Regtest(testutils::default_regtest_heights()),
             ]
             .iter()
             .find_map(|chain| Address::decode(chain, address).zip(Some(*chain)))

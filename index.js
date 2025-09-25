@@ -18,9 +18,10 @@ client.init().then(async (res)=> {
     // Fetch wallet balance
     const walletBal = client.fetchWalletBalance();
     console.log("Balance: ", walletBal);
-    const spendableBal = client.fetchTotalSpendableBalance();
-    console.log("Balance: ", spendableBal);
-
+    
+    const spendableBal = client.totalSpendableBalance;
+    console.log("Spendable balance: ", spendableBal);
+    
     // Get all addresses
     const addrs = client.fetchAllAddresses();
     console.log(addrs);
@@ -38,8 +39,8 @@ client.init().then(async (res)=> {
     // console.log(addr);
 
     // Get notes
-    //const notes = client.fetchNotes();    
-    //console.log(notes.orchard_notes.note_summaries[0])
+    const notes = client.fetchNotes();    
+    console.log(notes.orchard_notes.note_summaries[0]);
     
     // Get last txid
     const txid = client.fetchLastTxId();
@@ -59,9 +60,9 @@ client.init().then(async (res)=> {
       // console.log(txns);
       
       // And filter by tx kind (uncomment previous txns line)
-      const r = txns.value_transfers.filter((t) => t.kind == 'sent');
+      const r = txns.value_transfers.filter((t) => t.kind == 'received');
       
-      // Remove uncofnirmed transactionns (tx kind must be "sennt")
+      // Remove uncofnirmed transactionns (tx kind must be "sent")
       // const unconfirmed = r.filter((t) => t.status == 'calculated');
       // for(const tx of unconfirmed) {
       //   client.removeTransaction(tx.txid);
@@ -69,7 +70,7 @@ client.init().then(async (res)=> {
 
       let txCount = 0;
       for(const rx of r) {
-          console.log(rx);
+          // console.log(rx);
           txCount ++;
           if(txCount >= 3) break;
       }      
@@ -84,6 +85,12 @@ client.init().then(async (res)=> {
     // console.log(ufvk);
 
     // client.shieldTransparent();
+
+    // fetch totalbalance multiple times
+    setInterval(() => {
+      const bal = client.totalSpendableBalance;
+      console.log("Spendable balance: ", bal);
+    }, 5*1000);
 
     // client.deinitialize();
   

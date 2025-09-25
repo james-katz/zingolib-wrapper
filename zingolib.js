@@ -105,6 +105,12 @@ class ZingoLib {
             // const task = native.saveWalletTask();
             // console.log(task);
 
+            // Get confirmed balance
+            const balance = this.fetchWalletBalance();
+            if(balance) {
+                this.totalSpendableBalance = balance.confirmed_orchard_balance + balance.confirmed_sapling_balance;
+            }           
+                         
             // Do initial sync
             this.doRefresh(false);
 
@@ -236,7 +242,7 @@ class ZingoLib {
                         if(spStr == "Sync task is not complete.") {
                             console.log(spStr);
                             console.log(`Wallet height: ${this.lastWalletBlockHeight} | chain_tip: ${this.lastServerBlockHeight}`);                        
-                            console.log(ssJson.percentage_total_blocks_scanned)                            
+                            console.log(`Sync progress: ${ssJson.percentage_total_blocks_scanned.toFixed(2)}`);
                         }
                         else if(spStr == "Sync task has not been launched." ) {                            
                             console.log(spStr);
@@ -255,6 +261,8 @@ class ZingoLib {
                                     this.fetchWalletHeight();
                                     this.fetchServerHeight();
                                     this.doSaveWallet();
+
+                                    this.totalSpendableBalance = this.fetchTotalSpendableBalance();
                                                                     
                                     clearInterval(this.syncStatusInterval);
                                     this.syncStatusInterval = undefined;
@@ -280,7 +288,6 @@ class ZingoLib {
                 console.log(err);
                 return;
             }  
-            
         }
         else {
             console.log(`No new blocks to sync.`);
@@ -349,14 +356,9 @@ class ZingoLib {
     }   
 
     fetchTotalSpendableBalance() {
-        if(this.inRefresh || this.isSending) return this.totalSpendableBalance;
-
         try {
             const bal = native.getSpendableBalanceTotal();
-            // const bal = this.fetchWalletBalance();
             if (bal) {
-                // return (bal.confirmed_orchard_balance + bal.confirmed_sapling_balance) / 10 ** 8;
-                this.totalSpendableBalance = bal;
                 return bal;
             }
             else {
