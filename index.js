@@ -23,16 +23,17 @@ client.init().then(async (res)=> {
     console.log("Spendable balance: ", spendableBal);
     
     // Get all addresses
-    const addrs = client.fetchAllAddresses();
-    console.log(addrs);
+    //const addrs = client.fetchAllAddresses();
+    //console.log(addrs);
 
     // Get addresses with balance
     // const addrsB = await client.getAddressesWithBalance();
     // console.log(addrsB);
 
     // Create new address
-    // const newAddr = await client.createNewAddress();
-    // console.log(newAddr)
+     const newAddr = await client.createNewAddress();
+     console.log(newAddr)
+    
 
     // Parse address info
     // let addr = client.parseAddress("u1x3vsk4l5nhc930g2g6dcjrpv834k8zrs5rymz3l0nlcm9mu25erjxth46atkm4s8ztn3v02vcjuw00c53c8drp90jlz22vt5y03yu0v4dlzlexrwxdfnd3qnaelypgnm7cq2eturugakqy0p52mwldhyyj820s9a9xf438uudpr9dulmsv8ycnfc8vvt2kx9y5s4wulxyqc2qh64a44");
@@ -77,8 +78,8 @@ client.init().then(async (res)=> {
     });
 
     // Get the wallet seed
-    // const seed = await client.getWalletSeed();
-    // console.log(seed);
+    const seed = await client.getWalletSeed();
+    console.log(seed);
 
     // Get the wallet ufvk
     // const ufvk = await client.getWalletUfvk();    
@@ -90,7 +91,7 @@ client.init().then(async (res)=> {
     setInterval(() => {
       const bal = client.totalSpendableBalance;
       console.log("Spendable balance: ", bal);
-    }, 5*1000);
+    }, 15*1000);
 
     // client.deinitialize();
   

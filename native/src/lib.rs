@@ -268,7 +268,7 @@ fn get_latest_block_server(server_uri: String) -> Result<String, String> {
 fn get_latest_block_wallet() -> Result<String, String> {
     if let Some(lightclient) = &*LIGHTCLIENT.read().unwrap() {
         let height = RT.block_on(async move {
-            lightclient.wallet.read().await.sync_state.fully_scanned_height().map(u32::from).unwrap_or(0)
+            lightclient.wallet.read().await.sync_state.highest_scanned_height().map(u32::from).unwrap_or(0)
         });
         Ok(json::object! {"height" => height}.pretty(2))
     } else {

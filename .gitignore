@@ -1,6 +1,8 @@
 .DS_Store
 node_modules
 
+restore_seed_local.js
+
 # local env files
 .env.local
 .env.*.local
@@ -26,7 +28,7 @@ index.node
 native/target
 dist/
 native/dist
-
+restore_seed_local.js
 
 # Added by cargo
 /target

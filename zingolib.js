@@ -108,7 +108,8 @@ class ZingoLib {
             // Get confirmed balance
             const balance = this.fetchWalletBalance();
             if(balance) {
-                this.totalSpendableBalance = balance.confirmed_orchard_balance + balance.confirmed_sapling_balance;
+                const combinedBalance = balance.confirmed_orchard_balance + balance.confirmed_sapling_balance + balance.confirmed_transparent_balance;
+                this.totalSpendableBalance = Number(combinedBalance / 10**8).toFixed(8);
             }           
                          
             // Do initial sync
@@ -239,6 +240,7 @@ class ZingoLib {
                         this.fetchWalletHeight();
 
                         const spStr = this.doSyncPoll();
+                        
                         if(spStr == "Sync task is not complete.") {
                             console.log(spStr);
                             console.log(`Wallet height: ${this.lastWalletBlockHeight} | chain_tip: ${this.lastServerBlockHeight}`);                        
@@ -250,30 +252,29 @@ class ZingoLib {
                             this.syncStatusInterval = undefined;
                             this.inRefresh = false;  
                         }
-                        else {
-                            if(ssJson.percentage_total_blocks_scanned >= 100) {
-                                try {
-                                    // const spStr = await this.doSyncPoll();
-                                    // console.log(spStr);
-                                    const spJson = JSON.parse(spStr);
-                                    console.log(`sync_complete { "blocks_scanned": ${spJson.sync_complete?.blocks_scanned} }\n`);
-                                    
-                                    this.fetchWalletHeight();
-                                    this.fetchServerHeight();
-                                    this.doSaveWallet();
+                        else if(ssJson && ssJson.percentage_total_blocks_scanned >= 100) {
+                            try {
+                                // const spStr = await this.doSyncPoll();
+                                // console.log(spStr);
+                                // this.stopSyncProcess();
+                                const spJson = JSON.parse(spStr);
+                                console.log(`sync_complete { "blocks_scanned": ${spJson.sync_complete?.blocks_scanned} }\n`);
+                                
+                                this.fetchWalletHeight();
+                                this.fetchServerHeight();
+                                this.doSaveWallet();
 
-                                    this.totalSpendableBalance = this.fetchTotalSpendableBalance();
-                                                                    
-                                    clearInterval(this.syncStatusInterval);
-                                    this.syncStatusInterval = undefined;
-                                    this.inRefresh = false;                                                                
-                                }
-                                catch(e) { 
-                                    clearInterval(this.syncStatusInterval);
-                                    this.syncStatusInterval = undefined;
-                                    this.inRefresh = false;  
-                                }                            
+                                this.totalSpendableBalance = this.fetchTotalSpendableBalance();
+                                                                
+                                clearInterval(this.syncStatusInterval);
+                                this.syncStatusInterval = undefined;
+                                this.inRefresh = false;                                                                
                             }
+                            catch(e) { 
+                                clearInterval(this.syncStatusInterval);
+                                this.syncStatusInterval = undefined;
+                                this.inRefresh = false;  
+                            }                            
                         }
                     }, 4 * 1000);
                 }
@@ -290,7 +291,7 @@ class ZingoLib {
             }  
         }
         else {
-            console.log(`No new blocks to sync.`);
+            console.log(`No new blocks to sync. Wallet height: ${this.lastWalletBlockHeight} | Server height: ${this.lastServerBlockHeight}`);
         }
     }
 
@@ -358,8 +359,9 @@ class ZingoLib {
     fetchTotalSpendableBalance() {
         try {
             const bal = native.getSpendableBalanceTotal();
+            // const bal = this.fetchWalletBalance();
             if (bal) {
-                return bal;
+                return Number(bal / 10**8).toFixed(8);
             }
             else {
                 throw(`Internal Error wallet balance ${bal}`);
