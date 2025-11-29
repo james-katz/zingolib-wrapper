@@ -31,8 +31,8 @@ client.init().then(async (res)=> {
     // console.log(addrsB);
 
     // Create new address
-     const newAddr = await client.createNewAddress();
-     console.log(newAddr)
+    //  const newAddr = await client.createNewAddress();
+    //  console.log(newAddr)
     
 
     // Parse address info
@@ -71,15 +71,15 @@ client.init().then(async (res)=> {
 
       let txCount = 0;
       for(const rx of r) {
-          // console.log(rx);
+          console.log(rx);
           txCount ++;
           if(txCount >= 3) break;
       }      
     });
 
     // Get the wallet seed
-    const seed = await client.getWalletSeed();
-    console.log(seed);
+    // const seed = await client.getWalletSeed();
+    // console.log(seed);
 
     // Get the wallet ufvk
     // const ufvk = await client.getWalletUfvk();    

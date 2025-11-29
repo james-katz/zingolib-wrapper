@@ -8,7 +8,7 @@ use lazy_static::lazy_static;
 use tokio::runtime::Runtime;
 use zcash_address::ZcashAddress;
 use zcash_protocol::{memo::MemoBytes, value::Zatoshis};
-use zingolib::{config::{construct_lightwalletd_uri, ChainType, ZingoConfig}, data::{proposal::total_fee, receivers::{transaction_request_from_receivers, Receivers}, PollReport}, testutils, utils::conversion::txid_from_hex_encoded_str, wallet::{keys::unified::ReceiverSelection, LightWallet, WalletBase, WalletSettings}};
+use zingolib::{config::{construct_lightwalletd_uri, ChainType, ZingoConfig}, data::{proposal::total_fee, receivers::{transaction_request_from_receivers, Receivers}, PollReport}, utils::conversion::txid_from_hex_encoded_str, wallet::{keys::unified::ReceiverSelection, LightWallet, WalletBase, WalletSettings}};
 use zingolib::lightclient::LightClient;
 
 use std::{fs::File, io::Write, sync::RwLock};
@@ -50,7 +50,7 @@ fn construct_uri_load_config(
     let chaintype = match chain_hint.as_str() {
         "main" => ChainType::Mainnet,
         "test" => ChainType::Testnet,
-        "regtest" => ChainType::Regtest(testutils::default_regtest_heights()),
+        // "regtest" => ChainType::Regtest(testutils::default_regtest_heights()),
         _ => return Err("Error: Not a valid chain hint!".to_string()),
     };
     let config = match zingolib::config::load_clientconfig(
@@ -64,7 +64,8 @@ fn construct_uri_load_config(
             },
             min_confirmations: NonZeroU32::try_from(3).unwrap(),
         },
-        NonZeroU32::try_from(1).expect("hard-coded integer")
+        NonZeroU32::try_from(1).expect("hard-coded integer"),
+        String::from("zingo-wallet.dat")
     ) {
         Ok(c) => c,
         Err(e) => {
@@ -403,7 +404,7 @@ fn parse_address(address: String) -> Result<String, String> {
             [
                 ChainType::Mainnet,
                 ChainType::Testnet,
-                ChainType::Regtest(testutils::default_regtest_heights()),
+                // ChainType::Regtest(testutils::default_regtest_heights()),
             ]
             .iter()
             .find_map(|chain| Address::decode(chain, address).zip(Some(*chain)))
